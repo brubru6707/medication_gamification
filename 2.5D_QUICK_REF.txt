@@ -1,0 +1,160 @@
+================================================================
+🎮 2.5D GAME WITH IDLE ANIMATIONS - QUICK REFERENCE
+================================================================
+
+✅ NEW FEATURES ADDED:
+
+1. IDLE ANIMATIONS (Characters come alive!)
+   ├─ Starts after 1 second of standing still
+   ├─ Gradually builds up over 2 seconds
+   ├─ Squishing (breathing effect)
+   ├─ Bobbing (floating up/down)
+   ├─ Swaying (side to side)
+   └─ Subtle rotation (tilting)
+
+2. 2.5D PERSPECTIVE (3D world, 2D sprites)
+   ├─ 3D-style platforms with depth shading
+   ├─ Camera rotation around world
+   ├─ Parallax depth effects
+   └─ Characters stay 2D
+
+3. CAMERA ROTATION (Rotate the view!)
+   ├─ Q = Rotate LEFT
+   ├─ E = Rotate RIGHT
+   └─ R = RESET view
+
+================================================================
+🎮 COMPLETE CONTROLS
+================================================================
+
+MOVEMENT:
+  ← Left Arrow .......... Move left
+  → Right Arrow ......... Move right
+  ↑ Up Arrow ............ Jump
+
+CAMERA:
+  Q ..................... Rotate camera left
+  E ..................... Rotate camera right
+  R ..................... Reset camera to front
+
+CHARACTERS:
+  1 ..................... Switch to Robitussin
+  2 ..................... Switch to Albuterol
+
+================================================================
+🌟 IDLE ANIMATION DETAILS
+================================================================
+
+Timeline:
+  0-1 sec ............... Normal (no animation)
+  1-3 sec ............... Build-up (0% → 100%)
+  3+ sec ................ Full animation
+
+Effects:
+  Squish ................ ±8% scale (breathing)
+  Bob ................... ±5 pixels vertical
+  Sway .................. ±3 pixels horizontal
+  Rotate ................ ±2 degrees
+
+Triggers:
+  ✅ Not moving
+  ✅ On the ground
+  ✅ 1 second passed
+
+Stops When:
+  ❌ Any movement key
+  ❌ Jumping
+  ❌ Moving character
+
+================================================================
+🎬 2.5D PERSPECTIVE DETAILS
+================================================================
+
+Platform Shading:
+  Top Surface ........... Bright green
+  Front Face ............ Medium green
+  Right Side ............ Dark green
+
+Camera Effects:
+  Depth Offset .......... Platforms shift by depth
+  Parallax .............. Closer = more movement
+  Scale Effect .......... Platforms scale slightly
+
+Depth Layers:
+  Layer 0 ............... Ground (farthest)
+  Layer 1 ............... Mid platforms
+  Layer 2 ............... High platforms
+  Layer 10 .............. Characters (on top)
+
+================================================================
+🔧 CUSTOMIZATION (in game.js)
+================================================================
+
+Idle Animation Intensity:
+  squishAmount = 0.08 ... Try 0.05-0.12
+  bobAmount = 5 ......... Try 3-8 pixels
+  swayAmount = 3 ........ Try 1-5 pixels
+  rotationAmount = 0.02 . Try 0.01-0.04
+
+Idle Timer:
+  if (idleTimer > 1.0) .. Try 0.5-2.0 seconds
+  progress += 0.5 ....... Try 0.3-0.8 (speed)
+
+Camera Rotation:
+  cameraAngle -= 0.02 ... Try 0.01-0.04
+
+Depth Effect:
+  depthOffset * 30 ...... Try 20-50
+  yOffset * 10 .......... Try 5-20
+
+================================================================
+✨ WHAT YOU GET
+================================================================
+
+✅ Living, breathing characters
+✅ 2.5D perspective with depth
+✅ Smooth idle animations
+✅ Camera rotation
+✅ 3D-looking platforms
+✅ Professional game feel
+✅ Polished, dynamic world
+
+================================================================
+🎯 TESTING STEPS
+================================================================
+
+1. Open index.html in browser
+2. Let character stand still
+3. Count to 1 second
+4. Watch character come alive!
+5. Press Q/E to rotate camera
+6. Press 1/2 to switch characters
+7. Enjoy the 2.5D world!
+
+================================================================
+💡 PRO TIPS
+================================================================
+
+• Idle animations add personality to your characters
+• Use camera rotation to show off the 3D depth
+• Mix and match different characters for variety
+• Idle animations make the game feel more alive
+• 2.5D gives a modern look to pixel art
+
+================================================================
+🚀 YOUR GAME NOW HAS
+================================================================
+
+✅ AI-generated custom sprites
+✅ Transparent backgrounds
+✅ 8-bit pixelated style
+✅ Idle animations (squish, bob, sway, rotate)
+✅ 2.5D perspective
+✅ Camera rotation
+✅ 3D-looking platforms
+✅ Character switching
+✅ Professional polish
+
+All powered by Gemini AI! 🎮✨
+
+================================================================

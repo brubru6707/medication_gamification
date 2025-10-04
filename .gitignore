@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+
+# Generated images
+*.png
+!assets/*.png
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# API keys (backup - already in code for demo)
+# In production, move API keys to .env files!
