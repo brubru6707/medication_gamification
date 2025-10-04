@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medication Battle Arena - Multiplayer Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        .hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .round-info {
+            text-align: center;
+            flex: 1;
+        }
+
+        .round-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #e74c3c;
+            margin-bottom: 5px;
+        }
+
+        .round-subtitle {
+            font-size: 1em;
+            color: #bdc3c7;
+        }
+
+        .players-hud {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-around;
+            z-index: 1000;
+        }
+
+        .player-card {
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            padding: 15px;
+            min-width: 200px;
+            backdrop-filter: blur(10px);
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .player-card.self {
+            border-color: #3498db;
+            box-shadow: 0 0 20px rgba(52, 152, 219, 0.5);
+        }
+
+        .player-card.dead {
+            opacity: 0.5;
+            border-color: #e74c3c;
+        }
+
+        .player-name {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #ecf0f1;
+        }
+
+        .player-hp {
+            margin-bottom: 10px;
+        }
+
+        .hp-bar {
+            width: 100%;
+            height: 8px;
+            background: #34495e;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .hp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #e74c3c, #f39c12, #27ae60);
+            transition: width 0.3s ease;
+        }
+
+        .player-wins {
+            font-size: 0.9em;
+            color: #f39c12;
+            font-weight: bold;
+        }
+
+        .controls-help {
+            position: absolute;
+            top: 80px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+        }
+
+        .controls-help h4 {
+            color: #f39c12;
+            margin-bottom: 10px;
+        }
+
+        .controls-help div {
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+
+        .game-messages {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 2000;
+            pointer-events: none;
+        }
+
+        .big-message {
+            font-size: 3em;
+            font-weight: bold;
+            color: #e74c3c;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            margin-bottom: 20px;
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        .sub-message {
+            font-size: 1.5em;
+            color: #ecf0f1;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+
+        @keyframes fadeInScale {
+            0% {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 3000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            border-radius: 15px;
+            padding: 40px;
+            max-width: 600px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+
+        .modal h2 {
+            margin-bottom: 20px;
+            color: #f39c12;
+            font-size: 2.5em;
+        }
+
+        .standings {
+            margin: 20px 0;
+        }
+
+        .standing-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+        }
+
+        .standing-item.winner {
+            background: linear-gradient(90deg, #f39c12, #e67e22);
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+
+        .countdown-timer {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(231, 76, 60, 0.9);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 1.2em;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- HUD -->
+        <div class="hud">
+            <div class="round-info">
+                <div class="round-title" id="roundTitle">Round 1 of 3</div>
+                <div class="round-subtitle" id="roundSubtitle">Battle Royale - Last Monster Standing!</div>
+            </div>
+        </div>
+
+        <!-- Controls Help -->
+        <div class="controls-help">
+            <h4>🎮 Controls</h4>
+            <div>↑↓←→ Move</div>
+            <div>1/2/3 Use Features</div>
+            <div>Aim with arrows</div>
+        </div>
+
+        <!-- Countdown Timer -->
+        <div class="countdown-timer" id="countdownTimer" style="display: none;">
+            Time: 0:00
+        </div>
+
+        <!-- Players HUD -->
+        <div class="players-hud" id="playersHud">
+            <!-- Player cards will be dynamically added here -->
+        </div>
+
+        <!-- Game Messages -->
+        <div class="game-messages" id="gameMessages">
+            <!-- Dynamic messages appear here -->
+        </div>
+
+        <!-- Phaser Game Canvas will be inserted here -->
+    </div>
+
+    <!-- Round Results Modal -->
+    <div class="modal" id="roundResultsModal">
+        <div class="modal-content">
+            <h2 id="roundResultTitle">Round 1 Complete!</h2>
+            <div id="roundResultContent">
+                <div class="standings" id="roundStandings">
+                    <!-- Standings will be populated here -->
+                </div>
+                <p id="nextRoundInfo">Preparing for next round...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Final Results Modal -->
+    <div class="modal" id="finalResultsModal">
+        <div class="modal-content">
+            <h2>🏆 Battle Complete!</h2>
+            <div id="finalResultContent">
+                <div class="standings" id="finalStandings">
+                    <!-- Final standings will be populated here -->
+                </div>
+                <div id="gameStats"></div>
+                <button class="btn" onclick="returnToLobby()">Return to Lobby</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+    <script type="module">
+        // Multiplayer game implementation
+        let socket = null;
+        let game = null;
+        let playerData = {};
+        let gameState = {
+            room: null,
+            players: {},
+            currentRound: 1,
+            maxRounds: 3,
+            roundStartTime: null,
+            gamePhase: 'waiting' // waiting, playing, round_end, game_end
+        };
+
+        // Load player data from localStorage
+        const storedData = localStorage.getItem('currentMonster');
+        if (storedData) {
+            playerData = JSON.parse(storedData);
+            console.log('✅ Loaded player data:', playerData.med_name);
+            console.log('🔍 Received sprite_url?', !!playerData.sprite_url);
+            console.log('🔍 Received med_desc?', !!playerData.med_desc);
+            console.log('🔍 Received account_id?', !!playerData.account_id);
+            console.log('📦 Complete playerData:', playerData);
+        } else {
+            alert('No character data found! Please create a character first.');
+            window.location.href = 'index.html';
+        }
+
+        // Get room ID from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomId = urlParams.get('room');
+
+        if (!roomId) {
+            alert('No room specified! Returning to lobby.');
+            window.location.href = 'join-lobby.html';
+        }
+
+        // Phaser game configuration
+        const config = {
+            type: Phaser.AUTO,
+            width: window.innerWidth,
+            height: window.innerHeight,
+            backgroundColor: '#ffffff',
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 },
+                    debug: false
+                }
+            },
+            scale: {
+                mode: Phaser.Scale.RESIZE,
+                autoCenter: Phaser.Scale.CENTER_BOTH
+            },
+            parent: 'gameContainer',
+            scene: {
+                preload: preload,
+                create: create,
+                update: update
+            }
+        };
+
+        // Game objects
+        let characters = {};
+        let cursors;
+        let keys;
+        let projectiles;
+        let gameReady = false;
+
+        function preload() {
+            // Load feature sprites
+            this.load.image('fireball', 'assets/features/fireball.png');
+            this.load.image('black_smoke', 'assets/features/black_smoke.png');
+            this.load.image('poison_droplets', 'assets/features/posion_dropplets.png');
+            this.load.image('shield', 'assets/features/shield.png');
+            this.load.image('yellow_cloud', 'assets/features/yellow_cloud.png');
+            
+            // Load environment sprites
+            this.load.image('long_tree', 'assets/surroundings/long_tree.png');
+            this.load.image('red_tree', 'assets/surroundings/red_tree.png');
+            this.load.image('regular_tree', 'assets/surroundings/regular_tree.png');
+            this.load.image('crystal_boulder', 'assets/surroundings/crystal_boulder.png');
+            this.load.image('rectangular_boulder', 'assets/surroundings/rectangular_boulder.png');
+            this.load.image('regular_boulder', 'assets/surroundings/regular_boulder.png');
+        }
+
+        async function create() {
+            // Set world bounds to match single-player (3000x3000)
+            this.physics.world.setBounds(0, 0, 3000, 3000);
+            
+            // Setup camera
+            this.cameras.main.setBounds(0, 0, 3000, 3000);
+            this.cameras.main.setZoom(1);
+            
+            // Create projectiles group
+            projectiles = this.physics.add.group();
+            
+            // Create environment
+            createEnvironment(this);
+            
+            // Setup input
+            cursors = this.input.keyboard.createCursorKeys();
+            keys = this.input.keyboard.addKeys({
+                one: Phaser.Input.Keyboard.KeyCodes.ONE,
+                two: Phaser.Input.Keyboard.KeyCodes.TWO,
+                three: Phaser.Input.Keyboard.KeyCodes.THREE
+            });
+
+            // Setup feature input handlers
+            this.input.keyboard.on('keydown-ONE', () => activateFeature(this, 1));
+            this.input.keyboard.on('keydown-TWO', () => activateFeature(this, 2));
+            this.input.keyboard.on('keydown-THREE', () => activateFeature(this, 3));
+            
+            gameReady = true;
+            console.log('✅ Multiplayer game initialized');
+        }
+
+        function update() {
+            if (!gameReady || gameState.gamePhase !== 'playing') return;
+            
+            const myCharacter = characters[socket.playerId];
+            if (!myCharacter || !myCharacter.isAlive) return;
+            
+            // Update all character name labels to follow sprites
+            Object.values(characters).forEach(char => {
+                if (char.sprite && char.nameText) {
+                    char.nameText.x = char.sprite.x;
+                    char.nameText.y = char.sprite.y - 40;
+                }
+            });
+            
+            // Handle movement
+            const speed = 200;
+            let moved = false;
+            
+            if (cursors.left.isDown) {
+                myCharacter.sprite.setVelocityX(-speed);
+                myCharacter.sprite.flipX = true;
+                moved = true;
+            } else if (cursors.right.isDown) {
+                myCharacter.sprite.setVelocityX(speed);
+                myCharacter.sprite.flipX = false;
+                moved = true;
+            } else {
+                myCharacter.sprite.setVelocityX(0);
+            }
+            
+            if (cursors.up.isDown) {
+                myCharacter.sprite.setVelocityY(-speed);
+                moved = true;
+            } else if (cursors.down.isDown) {
+                myCharacter.sprite.setVelocityY(speed);
+                moved = true;
+            } else {
+                myCharacter.sprite.setVelocityY(0);
+            }
+            
+            // Send movement to server (throttled)
+            if (moved && Date.now() - myCharacter.lastMoveSent > 50) {
+                sendPlayerAction({
+                    type: 'move',
+                    x: myCharacter.sprite.x,
+                    y: myCharacter.sprite.y,
+                    velocityX: myCharacter.sprite.body.velocity.x,
+                    velocityY: myCharacter.sprite.body.velocity.y,
+                    flipX: myCharacter.sprite.flipX
+                });
+                myCharacter.lastMoveSent = Date.now();
+            }
+        }
+
+        function createEnvironment(scene) {
+            // Create trees and boulders like single-player game
+            const treeTypes = ['long_tree', 'red_tree', 'regular_tree'];
+            const boulderTypes = ['crystal_boulder', 'rectangular_boulder', 'regular_boulder'];
+            
+            const trees = [];
+            const boulders = [];
+            const numTrees = 25; // Same as single-player
+            const numBoulders = 20; // Same as single-player
+            const minDistance = 200; // Minimum distance between obstacles
+            const minDistanceFromPlayers = 300; // Keep clear of player spawns
+            
+            // Helper function to check if position is valid
+            function isValidPosition(x, y, obstacles, minDist) {
+                // Check against existing obstacles
+                for (let obstacle of obstacles) {
+                    const distance = Phaser.Math.Distance.Between(x, y, obstacle.x, obstacle.y);
+                    if (distance < minDist) {
+                        return false;
+                    }
+                }
+                
+                // Check against all player positions
+                for (let charId in characters) {
+                    const char = characters[charId];
+                    if (char && char.sprite) {
+                        const distance = Phaser.Math.Distance.Between(x, y, char.sprite.x, char.sprite.y);
+                        if (distance < minDistanceFromPlayers) {
+                            return false;
+                        }
+                    }
+                }
+                
+                return true;
+            }
+            
+            // Create trees with proper spacing
+            let attempts = 0;
+            while (trees.length < numTrees && attempts < 500) {
+                attempts++;
+                
+                const x = Phaser.Math.Between(300, 2700);
+                const y = Phaser.Math.Between(300, 2700);
+                
+                if (isValidPosition(x, y, trees, minDistance)) {
+                    const treeType = Phaser.Math.RND.pick(treeTypes);
+                    const scale = Phaser.Math.FloatBetween(1.5, 3.5);
+                    
+                    const tree = scene.physics.add.sprite(x, y, treeType);
+                    const visualScale = scale * 0.1;
+                    tree.setScale(visualScale);
+                    tree.setDepth(-1);
+                    tree.body.setImmovable(true);
+                    tree.body.moves = false;
+                    tree.body.allowGravity = false;
+                    
+                    // Reduce hitbox to 50%
+                    tree.body.setSize(tree.width * 0.5, tree.height * 0.5);
+                    tree.body.setOffset(tree.width * 0.25, tree.height * 0.25);
+                    
+                    // Add breathing animation
+                    const animationDelay = Phaser.Math.Between(0, 2000);
+                    scene.time.delayedCall(animationDelay, () => {
+                        scene.tweens.add({
+                            targets: tree,
+                            scaleX: visualScale * 1.03,
+                            scaleY: visualScale * 1.03,
+                            duration: Phaser.Math.Between(2000, 5000),
+                            yoyo: true,
+                            repeat: -1,
+                            ease: 'Sine.easeInOut'
+                        });
+                    });
+                    
+                    trees.push(tree);
+                }
+            }
+            
+            // Create boulders with proper spacing
+            attempts = 0;
+            const allObstacles = [...trees];
+            
+            while (boulders.length < numBoulders && attempts < 500) {
+                attempts++;
+                
+                const x = Phaser.Math.Between(300, 2700);
+                const y = Phaser.Math.Between(300, 2700);
+                
+                if (isValidPosition(x, y, allObstacles, 180)) {
+                    const boulderType = Phaser.Math.RND.pick(boulderTypes);
+                    const scale = Phaser.Math.FloatBetween(0.5, 3.0);
+                    
+                    const boulder = scene.physics.add.sprite(x, y, boulderType);
+                    const visualScale = scale * 0.1;
+                    boulder.setScale(visualScale);
+                    boulder.setDepth(-1);
+                    boulder.body.setImmovable(true);
+                    boulder.body.moves = false;
+                    boulder.body.allowGravity = false;
+                    
+                    // Reduce hitbox to 50%
+                    boulder.body.setSize(boulder.width * 0.5, boulder.height * 0.5);
+                    boulder.body.setOffset(boulder.width * 0.25, boulder.height * 0.25);
+                    
+                    boulders.push(boulder);
+                    allObstacles.push(boulder);
+                }
+            }
+            
+            // Store in scene for collision detection
+            scene.trees = scene.physics.add.group();
+            scene.boulders = scene.physics.add.group();
+            
+            trees.forEach(tree => scene.trees.add(tree));
+            boulders.forEach(boulder => scene.boulders.add(boulder));
+            
+            // Add collisions with all player characters
+            for (let charId in characters) {
+                const char = characters[charId];
+                if (char && char.sprite) {
+                    scene.physics.add.collider(char.sprite, scene.trees);
+                    scene.physics.add.collider(char.sprite, scene.boulders);
+                }
+            }
+        }
+
+        function activateFeature(scene, featureNum) {
+            const myCharacter = characters[socket.playerId];
+            if (!myCharacter || !myCharacter.isAlive) return;
+            
+            const featureName = myCharacter.features[featureNum - 1];
+            if (!featureName || featureName === 'none') return;
+            
+            console.log(`Activating feature: ${featureName}`);
+            
+            // Send feature activation to server
+            sendPlayerAction({
+                type: 'feature',
+                feature: featureName,
+                featureNum: featureNum,
+                position: {
+                    x: myCharacter.sprite.x,
+                    y: myCharacter.sprite.y
+                },
+                direction: getAimDirection()
+            });
+        }
+
+        function getAimDirection() {
+            if (cursors.up.isDown) return { x: 0, y: -1 };
+            if (cursors.down.isDown) return { x: 0, y: 1 };
+            if (cursors.left.isDown) return { x: -1, y: 0 };
+            if (cursors.right.isDown) return { x: 1, y: 0 };
+            return { x: 1, y: 0 }; // Default direction
+        }
+
+        function sendPlayerAction(action) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: 'player_action',
+                    action: action
+                }));
+            }
+        }
+
+        function connectToServer() {
+            socket = new WebSocket('ws://localhost:3001');
+            
+            socket.onopen = () => {
+                console.log('Connected to multiplayer server');
+                
+                // Register player with server
+                socket.send(JSON.stringify({
+                    type: 'register',
+                    playerData: playerData
+                }));
+                
+                console.log('📤 Sent registration for:', playerData.med_name);
+            };
+            
+            socket.onmessage = (event) => {
+                console.log("LOOK AT THIS->>>", event)
+                const message = JSON.parse(event.data);
+                handleServerMessage(message);
+            };
+            
+            socket.onclose = () => {
+                console.log('Disconnected from server');
+                showMessage('Connection Lost', 'Attempting to reconnect...');
+                
+                // Try to reconnect
+                setTimeout(connectToServer, 3000);
+            };
+            
+            socket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function handleServerMessage(message) {
+            console.log('📨 Received message:', message.type, message);
+            
+            switch (message.type) {
+                case 'registered':
+                    // Store our player ID
+                    socket.playerId = message.playerId;
+                    console.log(`✅ Registered as player: ${message.playerName} (${message.playerId})`);
+                    break;
+                case 'game_started':
+                    console.log('🎮 Game started message received!');
+                    initializeGame(message);
+                    break;
+                case 'player_action':
+                    handlePlayerAction(message);
+                    break;
+                case 'player_damage':
+                    handlePlayerDamage(message);
+                    break;
+                case 'player_defeated':
+                    handlePlayerDefeated(message);
+                    break;
+                case 'round_ended':
+                    handleRoundEnd(message);
+                    break;
+                case 'round_starting':
+                    handleRoundStart(message);
+                    break;
+                case 'game_ended':
+                    handleGameEnd(message);
+                    break;
+                case 'return_to_lobby':
+                    returnToLobby();
+                    break;
+            }
+        }
+
+        function initializeGame(data) {
+            gameState.room = data.roomId;
+            gameState.currentRound = data.round;
+            gameState.maxRounds = data.maxRounds;
+            gameState.gamePhase = 'playing';
+            gameState.roundStartTime = Date.now();
+            
+            console.log(`🎮 Initializing game for player ID: ${socket.playerId}`);
+            
+            // Initialize players
+            data.players.forEach(player => {
+                gameState.players[player.id] = player;
+                createPlayerCharacter(player);
+            });
+            
+            updateHUD();
+            showMessage('Round 1', 'Battle begins!');
+            
+            setTimeout(() => {
+                document.getElementById('gameMessages').innerHTML = '';
+            }, 3000);
+        }
+
+        function createPlayerCharacter(playerData) {
+            if (!game || !game.scene.scenes[0]) return;
+            
+            const scene = game.scene.scenes[0];
+            // Spawn in larger world (3000x3000 like single-player)
+            const spawnX = Phaser.Math.Between(400, 2600);
+            const spawnY = Phaser.Math.Between(400, 2600);
+            
+            // Create character sprite (use fireball as placeholder)
+            const sprite = scene.physics.add.sprite(spawnX, spawnY, 'fireball');
+            sprite.setScale(0.5); // Larger scale so you can see them
+            sprite.setCollideWorldBounds(true);
+            
+            // Add collisions with environment
+            if (scene.trees) {
+                scene.physics.add.collider(sprite, scene.trees);
+            }
+            if (scene.boulders) {
+                scene.physics.add.collider(sprite, scene.boulders);
+            }
+            
+            // Store character data
+            characters[playerData.id] = {
+                id: playerData.id,
+                name: playerData.name,
+                sprite: sprite,
+                hp: playerData.hp,
+                maxHp: playerData.maxHp,
+                attack: playerData.attack,
+                features: playerData.features,
+                isAlive: true,
+                wins: 0,
+                lastMoveSent: 0
+            };
+            
+            // Add name label
+            const nameText = scene.add.text(spawnX, spawnY - 40, playerData.name, {
+                fontSize: '18px',
+                fill: '#ffffff',
+                stroke: '#000000',
+                strokeThickness: 3
+            });
+            nameText.setOrigin(0.5);
+            
+            characters[playerData.id].nameText = nameText;
+            
+            // If this is our player, make camera follow them immediately
+            if (playerData.id === socket.playerId) {
+                console.log('📷 Camera following our player:', playerData.name);
+                scene.cameras.main.startFollow(sprite, true, 0.1, 0.1);
+            }
+            
+            console.log(`✅ Created character: ${playerData.name} at (${spawnX}, ${spawnY})`);
+        }
+
+        function handlePlayerAction(message) {
+            const character = characters[message.playerId];
+            if (!character) return;
+            
+            const action = message.action;
+            
+            switch (action.type) {
+                case 'move':
+                    // Update other players' positions
+                    if (message.playerId !== socket.playerId) {
+                        character.sprite.x = action.x;
+                        character.sprite.y = action.y;
+                        character.sprite.setVelocity(action.velocityX, action.velocityY);
+                        character.sprite.flipX = action.flipX;
+                    }
+                    break;
+                    
+                case 'feature':
+                    executeFeature(character, action);
+                    break;
+            }
+        }
+
+        function executeFeature(character, action) {
+            if (!game || !game.scene.scenes[0]) return;
+            
+            const scene = game.scene.scenes[0];
+            const feature = action.feature;
+            
+            switch (feature) {
+                case 'fireball':
+                case 'black_smoke':
+                case 'poison_droplets':
+                    createProjectile(scene, character, feature, action.direction);
+                    break;
+                    
+                case 'shield':
+                    createShieldEffect(scene, character);
+                    break;
+                    
+                case 'yellow_cloud':
+                    createHealingEffect(scene, character);
+                    break;
+            }
+        }
+
+        function createProjectile(scene, character, type, direction) {
+            const projectile = scene.physics.add.sprite(character.sprite.x, character.sprite.y, type);
+            projectile.setScale(0.05);
+            projectile.body.setVelocity(direction.x * 400, direction.y * 400);
+            
+            // Add to projectiles group
+            projectiles.add(projectile);
+            
+            // Add collision with trees - projectile disappears when hitting tree
+            if (scene.trees) {
+                scene.physics.add.overlap(projectile, scene.trees, (proj, tree) => {
+                    if (proj && proj.active) {
+                        proj.destroy();
+                    }
+                });
+            }
+            
+            // Add collision with boulders - projectile disappears when hitting boulder
+            if (scene.boulders) {
+                scene.physics.add.overlap(projectile, scene.boulders, (proj, boulder) => {
+                    if (proj && proj.active) {
+                        proj.destroy();
+                    }
+                });
+            }
+            
+            // Destroy after 3 seconds
+            scene.time.delayedCall(3000, () => {
+                if (projectile && projectile.active) {
+                    projectile.destroy();
+                }
+            });
+            
+            // Add collision detection with other characters
+            Object.values(characters).forEach(otherCharacter => {
+                if (otherCharacter.id !== character.id && otherCharacter.isAlive) {
+                    scene.physics.add.overlap(projectile, otherCharacter.sprite, () => {
+                        // Calculate damage
+                        const damage = character.attack;
+                        
+                        // Send damage to server
+                        if (socket && socket.readyState === WebSocket.OPEN) {
+                            socket.send(JSON.stringify({
+                                type: 'player_damage',
+                                targetId: otherCharacter.id,
+                                damage: damage
+                            }));
+                        }
+                        
+                        projectile.destroy();
+                    }, null, scene);
+                }
+            });
+        }
+
+        function createShieldEffect(scene, character) {
+            const shield = scene.add.sprite(character.sprite.x, character.sprite.y, 'shield');
+            shield.setScale(0.15);
+            shield.setAlpha(0.7);
+            
+            // Follow character
+            const updateShield = () => {
+                if (shield && shield.active && character.sprite) {
+                    shield.x = character.sprite.x;
+                    shield.y = character.sprite.y;
+                }
+            };
+            
+            scene.events.on('postupdate', updateShield);
+            
+            // Remove after 5 seconds
+            scene.time.delayedCall(5000, () => {
+                scene.events.off('postupdate', updateShield);
+                if (shield && shield.active) {
+                    shield.destroy();
+                }
+            });
+        }
+
+        function createHealingEffect(scene, character) {
+            const healing = scene.add.sprite(character.sprite.x, character.sprite.y, 'yellow_cloud');
+            healing.setScale(0.1);
+            healing.setAlpha(0.5);
+            
+            // Follow character
+            const updateHealing = () => {
+                if (healing && healing.active && character.sprite) {
+                    healing.x = character.sprite.x;
+                    healing.y = character.sprite.y;
+                }
+            };
+            
+            scene.events.on('postupdate', updateHealing);
+            
+            // Remove after 3 seconds
+            scene.time.delayedCall(3000, () => {
+                scene.events.off('postupdate', updateHealing);
+                if (healing && healing.active) {
+                    healing.destroy();
+                }
+            });
+        }
+
+        function handlePlayerDamage(message) {
+            const character = characters[message.playerId];
+            if (!character) return;
+            
+            character.hp = message.newHp;
+            updatePlayerHUD(character);
+            
+            // Show damage effect
+            if (game && game.scene.scenes[0]) {
+                const scene = game.scene.scenes[0];
+                const damageText = scene.add.text(character.sprite.x, character.sprite.y - 30, `-${message.damage}`, {
+                    fontSize: '20px',
+                    fill: '#e74c3c',
+                    fontWeight: 'bold'
+                });
+                damageText.setOrigin(0.5);
+                
+                scene.tweens.add({
+                    targets: damageText,
+                    y: character.sprite.y - 60,
+                    alpha: 0,
+                    duration: 1000,
+                    onComplete: () => damageText.destroy()
+                });
+            }
+        }
+
+        function handlePlayerDefeated(message) {
+            const character = characters[message.playerId];
+            if (!character) return;
+            
+            character.isAlive = false;
+            character.hp = 0;
+            
+            // Visual effect for defeated player
+            if (character.sprite) {
+                character.sprite.setTint(0x666666);
+                character.sprite.setAlpha(0.5);
+            }
+            
+            updatePlayerHUD(character);
+            
+            if (message.playerId === socket.playerId) {
+                showMessage('Defeated!', 'You have been eliminated from this round.');
+            } else {
+                showMessage(`${character.name} Defeated!`, '');
+            }
+        }
+
+        function handleRoundEnd(message) {
+            gameState.gamePhase = 'round_end';
+            
+            // Update wins
+            if (message.winner) {
+                const winner = characters[message.winner.id];
+                if (winner) {
+                    winner.wins++;
+                }
+            }
+            
+            showRoundResults(message);
+        }
+
+        function handleRoundStart(message) {
+            gameState.currentRound = message.round;
+            gameState.gamePhase = 'playing';
+            gameState.roundStartTime = Date.now();
+            
+            // Reset all characters
+            message.players.forEach(playerData => {
+                const character = characters[playerData.id];
+                if (character) {
+                    character.hp = playerData.hp;
+                    character.isAlive = true;
+                    character.wins = playerData.wins;
+                    
+                    if (character.sprite) {
+                        character.sprite.clearTint();
+                        character.sprite.setAlpha(1);
+                        
+                        // Respawn at random position
+                        character.sprite.x = Phaser.Math.Between(200, 1800);
+                        character.sprite.y = Phaser.Math.Between(200, 1300);
+                    }
+                }
+            });
+            
+            updateHUD();
+            hideRoundResults();
+            showMessage(`Round ${message.round}`, 'Next battle begins!');
+            
+            setTimeout(() => {
+                document.getElementById('gameMessages').innerHTML = '';
+            }, 3000);
+        }
+
+        function handleGameEnd(message) {
+            gameState.gamePhase = 'game_end';
+            showFinalResults(message);
+        }
+
+        function updateHUD() {
+            document.getElementById('roundTitle').textContent = `Round ${gameState.currentRound} of ${gameState.maxRounds}`;
+            
+            // Update players HUD
+            const playersHud = document.getElementById('playersHud');
+            playersHud.innerHTML = '';
+            
+            Object.values(characters).forEach(character => {
+                const playerCard = document.createElement('div');
+                playerCard.className = `player-card ${character.id === socket.playerId ? 'self' : ''} ${!character.isAlive ? 'dead' : ''}`;
+                playerCard.innerHTML = `
+                    <div class="player-name">${character.name}</div>
+                    <div class="player-hp">
+                        HP: ${character.hp}/${character.maxHp}
+                        <div class="hp-bar">
+                            <div class="hp-fill" style="width: ${(character.hp / character.maxHp) * 100}%"></div>
+                        </div>
+                    </div>
+                    <div class="player-wins">Wins: ${character.wins}</div>
+                `;
+                playersHud.appendChild(playerCard);
+            });
+        }
+
+        function updatePlayerHUD(character) {
+            // This will be called by updateHUD() regularly
+            updateHUD();
+        }
+
+        function showMessage(title, subtitle) {
+            const gameMessages = document.getElementById('gameMessages');
+            gameMessages.innerHTML = `
+                <div class="big-message">${title}</div>
+                <div class="sub-message">${subtitle}</div>
+            `;
+        }
+
+        function showRoundResults(data) {
+            const modal = document.getElementById('roundResultsModal');
+            const title = document.getElementById('roundResultTitle');
+            const standings = document.getElementById('roundStandings');
+            const nextInfo = document.getElementById('nextRoundInfo');
+            
+            title.textContent = `Round ${data.round} Complete!`;
+            
+            standings.innerHTML = data.standings.map((player, index) => `
+                <div class="standing-item ${index === 0 ? 'winner' : ''}">
+                    <span>${player.name}</span>
+                    <span>${player.wins} wins</span>
+                </div>
+            `).join('');
+            
+            if (data.round < gameState.maxRounds) {
+                nextInfo.textContent = `Round ${data.round + 1} starting soon...`;
+            } else {
+                nextInfo.textContent = 'Preparing final results...';
+            }
+            
+            modal.style.display = 'flex';
+        }
+
+        function hideRoundResults() {
+            document.getElementById('roundResultsModal').style.display = 'none';
+        }
+
+        function showFinalResults(data) {
+            hideRoundResults();
+            
+            const modal = document.getElementById('finalResultsModal');
+            const standings = document.getElementById('finalStandings');
+            const gameStats = document.getElementById('gameStats');
+            
+            standings.innerHTML = data.finalStandings.map((player, index) => `
+                <div class="standing-item ${index === 0 ? 'winner' : ''}">
+                    <span>${index + 1}. ${player.name}</span>
+                    <span>${player.wins} wins</span>
+                </div>
+            `).join('');
+            
+            const gameTime = Math.floor(data.gameStats.gameTime / 1000);
+            gameStats.innerHTML = `
+                <p>Game Duration: ${Math.floor(gameTime / 60)}:${(gameTime % 60).toString().padStart(2, '0')}</p>
+                <p>Total Rounds: ${data.gameStats.totalRounds}</p>
+                <p>Players: ${data.gameStats.playersCount}</p>
+            `;
+            
+            modal.style.display = 'flex';
+        }
+
+        function returnToLobby() {
+            window.location.href = 'join-lobby.html';
+        }
+
+        // Initialize game
+        game = new Phaser.Game(config);
+        connectToServer();
+
+        // Expose returnToLobby globally
+        window.returnToLobby = returnToLobby;
+    </script>
+</body>
+</html>

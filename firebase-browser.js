@@ -132,6 +132,97 @@ function getRandomEntry() {
   return entries[randomIndex];
 }
 
+// Ensure monster has at least one offensive ability
+async function ensureMonsterHasOffensiveAbility(monster, entry) {
+  const offensiveAbilities = ['fireball', 'poison_droplets'];
+  
+  // Check if monster has any offensive abilities
+  const hasOffensive = offensiveAbilities.some(ability => 
+    monster.feature_1 === ability || 
+    monster.feature_2 === ability || 
+    monster.feature_3 === ability
+  );
+  
+  if (hasOffensive) {
+    console.log(`✅ Monster "${monster.med_name}" already has offensive ability`);
+    return monster;
+  }
+  
+  console.log(`⚠️  Monster "${monster.med_name}" lacks offensive abilities! Fixing...`);
+  
+  // Choose a random offensive ability
+  const offensiveAbility = offensiveAbilities[Math.floor(Math.random() * offensiveAbilities.length)];
+  
+  // Find a feature to replace (prefer 'none' first, then least useful)
+  let replaceIndex = 1; // Default to feature_1
+  
+  if (monster.feature_1 === 'none') replaceIndex = 1;
+  else if (monster.feature_2 === 'none') replaceIndex = 2;
+  else if (monster.feature_3 === 'none') replaceIndex = 3;
+  else {
+    // If no 'none', replace a non-essential feature (prefer support over defense)
+    if (monster.feature_3 === 'yellow_cloud') replaceIndex = 3;
+    else if (monster.feature_2 === 'yellow_cloud') replaceIndex = 2;
+    else if (monster.feature_1 === 'yellow_cloud') replaceIndex = 1;
+  }
+  
+  console.log(`🔄 Replacing feature_${replaceIndex} with ${offensiveAbility}`);
+  
+  // Generate AI reason for the replacement
+  const reason = await generateOffensiveReasonInBrowser(monster.med_name, monster.med_desc, offensiveAbility);
+  
+  // Replace the feature
+  monster[`feature_${replaceIndex}`] = offensiveAbility;
+  monster[`feature_${replaceIndex}_reason`] = reason;
+  
+  // Save the updated monster back to Firebase
+  console.log(`💾 Saving updated monster to Firebase...`);
+  await saveMonster(monster);
+  
+  console.log(`✅ Monster "${monster.med_name}" now has offensive ability: ${offensiveAbility}`);
+  return monster;
+}
+
+// Generate AI reason for offensive ability (browser-compatible)
+async function generateOffensiveReasonInBrowser(medName, medDesc, offensiveAbility) {
+  console.log(`🧠 Generating AI reason for ${offensiveAbility} replacement...`);
+  
+  try {
+    // Call the backend to generate the reason
+    const response = await fetch('http://localhost:3000/generate-offensive-reason', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        med_name: medName,
+        med_desc: medDesc,
+        offensive_ability: offensiveAbility
+      })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      if (result.success) {
+        console.log(`✅ AI-generated reason: "${result.reason}"`);
+        return result.reason;
+      }
+    }
+    
+    console.log(`⚠️  AI reason generation failed, using fallback`);
+  } catch (error) {
+    console.log(`⚠️  Backend unavailable for AI reason, using fallback`);
+  }
+  
+  // Fallback reasons
+  const fallbackReasons = {
+    'fireball': 'Medication\'s potent effects manifest as burning energy',
+    'poison_droplets': 'Chemical compounds create toxic projectiles'
+  };
+  
+  return fallbackReasons[offensiveAbility] || 'Essential combat ability';
+}
+
 async function createRandomMonster() {
   console.log('🔍 Selecting a random entry from embedded data...');
   const entry = getRandomEntry();
@@ -180,6 +271,9 @@ async function createRandomMonster() {
         console.log('   Run: node sprite-generation-server.js');
       }
     }
+    
+    // Check if existing monster has offensive abilities
+    monster = await ensureMonsterHasOffensiveAbility(monster, entry);
     
     return monster;
   }

@@ -95,9 +95,14 @@ Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
 
     const text = response.candidates[0].content.parts[0].text;
     const cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const features = JSON.parse(cleanedText);
+    let features = JSON.parse(cleanedText);
     
     console.log(`✅ Features generated:`, features);
+    
+    // Ensure monster has at least one offensive ability
+    features = await ensureOffensiveAbility(features, medName, medDesc);
+    
+    console.log(`🗡️  Final features (with offensive check):`, features);
     return features;
   } catch (error) {
     console.error(`❌ Error generating features:`, error.message);
@@ -110,6 +115,95 @@ Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
       feature_3: "yellow_cloud",
       feature_3_reason: "Default healing ability"
     };
+  }
+}
+
+// Ensure monster has at least one offensive ability
+async function ensureOffensiveAbility(features, medName, medDesc) {
+  const offensiveAbilities = ['fireball', 'poison_droplets'];
+  
+  // Check if monster has any offensive abilities
+  const hasOffensive = offensiveAbilities.some(ability => 
+    features.feature_1 === ability || 
+    features.feature_2 === ability || 
+    features.feature_3 === ability
+  );
+  
+  if (hasOffensive) {
+    console.log(`✅ Monster already has offensive ability`);
+    return features;
+  }
+  
+  console.log(`⚠️  Monster lacks offensive abilities! Adding one...`);
+  
+  // Choose a random offensive ability
+  const offensiveAbility = offensiveAbilities[Math.floor(Math.random() * offensiveAbilities.length)];
+  
+  // Find a feature to replace (prefer 'none' first, then least useful)
+  let replaceIndex = 1; // Default to feature_1
+  
+  if (features.feature_1 === 'none') replaceIndex = 1;
+  else if (features.feature_2 === 'none') replaceIndex = 2;
+  else if (features.feature_3 === 'none') replaceIndex = 3;
+  else {
+    // If no 'none', replace a non-essential feature (prefer support over defense)
+    if (features.feature_3 === 'yellow_cloud') replaceIndex = 3;
+    else if (features.feature_2 === 'yellow_cloud') replaceIndex = 2;
+    else if (features.feature_1 === 'yellow_cloud') replaceIndex = 1;
+  }
+  
+  console.log(`🔄 Replacing feature_${replaceIndex} with ${offensiveAbility}`);
+  
+  // Generate AI reason for the replacement
+  const reason = await generateOffensiveReason(medName, medDesc, offensiveAbility);
+  
+  // Replace the feature
+  features[`feature_${replaceIndex}`] = offensiveAbility;
+  features[`feature_${replaceIndex}_reason`] = reason;
+  
+  return features;
+}
+
+// Generate AI reason for offensive ability replacement
+async function generateOffensiveReason(medName, medDesc, offensiveAbility) {
+  console.log(`🧠 Generating AI reason for ${offensiveAbility} replacement...`);
+  
+  const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+
+  const abilityDescriptions = {
+    'fireball': 'a powerful fire-based projectile attack',
+    'poison_droplets': 'toxic droplets that can poison enemies over time'
+  };
+
+  const prompt = `A medication-based game character needs ${abilityDescriptions[offensiveAbility]} as their offensive ability.
+
+Medication: ${medName}
+Description: ${medDesc}
+Ability: ${offensiveAbility}
+
+Create a creative, specific reason why this medication would have this offensive ability. Connect it to the medication's properties, effects, or purpose. Keep it concise (1-2 sentences, max 100 characters).
+
+Respond with ONLY the reason text, no quotes or extra formatting.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash-exp",
+      contents: prompt,
+    });
+
+    const reason = response.candidates[0].content.parts[0].text.trim();
+    console.log(`✅ AI-generated reason: "${reason}"`);
+    return reason;
+  } catch (error) {
+    console.error(`❌ Error generating AI reason:`, error.message);
+    
+    // Fallback reasons
+    const fallbackReasons = {
+      'fireball': 'Medication\'s potent effects manifest as burning energy',
+      'poison_droplets': 'Chemical compounds create toxic projectiles'
+    };
+    
+    return fallbackReasons[offensiveAbility] || 'Essential combat ability';
   }
 }
 
@@ -190,6 +284,29 @@ Style: Retro 8-bit video game sprite (NES/SNES era)`;
   }
 }
 
+// Endpoint to generate AI reason for offensive ability
+app.post('/generate-offensive-reason', async (req, res) => {
+  try {
+    const { med_name, med_desc, offensive_ability } = req.body;
+
+    console.log(`🧠 Generating AI reason for ${offensive_ability} on ${med_name}...`);
+
+    const reason = await generateOffensiveReason(med_name, med_desc, offensive_ability);
+
+    res.json({
+      success: true,
+      reason: reason
+    });
+
+  } catch (error) {
+    console.error('❌ Error generating offensive reason:', error);
+    res.status(500).json({
+      success: false, 
+      error: error.message
+    });
+  }
+});
+
 // Endpoint to generate a sprite for a specific monster
 app.post('/generate-sprite', async (req, res) => {
   try {
@@ -250,5 +367,7 @@ app.post('/generate-sprite', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Sprite Generation Server running on http://localhost:${PORT}`);
-  console.log(`📡 Endpoint: POST http://localhost:${PORT}/generate-sprite`);
+  console.log(`📡 Endpoints:`);
+  console.log(`   POST http://localhost:${PORT}/generate-sprite`);
+  console.log(`   POST http://localhost:${PORT}/generate-offensive-reason`);
 });

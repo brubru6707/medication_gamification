@@ -27,6 +27,44 @@ let character;
 let cursors;
 let keys;
 let characterData;
+
+// Calculate HP based on streak (days)
+function calculateHP(streakDays) {
+    const streakMonths = streakDays / 30; // Convert days to months
+    
+    if (streakMonths < 3) {
+        // 0-3 months: 50-200 HP
+        return Math.floor(Math.random() * (200 - 50 + 1)) + 50;
+    } else if (streakMonths < 6) {
+        // 3-6 months: 200-500 HP  
+        return Math.floor(Math.random() * (500 - 200 + 1)) + 200;
+    } else {
+        // 6+ months: 500-1000 HP
+        return Math.floor(Math.random() * (1000 - 500 + 1)) + 500;
+    }
+}
+
+// Calculate Attack based on streak (days)
+function calculateAttack(streakDays) {
+    const streakMonths = streakDays / 30; // Convert days to months
+    
+    if (streakMonths < 2) {
+        // 0-2 months: 10 attack (fixed)
+        return 10;
+    } else if (streakMonths < 4) {
+        // 2-4 months: 30-70 attack
+        return Math.floor(Math.random() * (70 - 30 + 1)) + 30;
+    } else if (streakMonths < 8) {
+        // 4-8 months: 70-100 attack
+        return Math.floor(Math.random() * (100 - 70 + 1)) + 70;
+    } else if (streakMonths < 12) {
+        // 8-12 months: 100-150 attack
+        return Math.floor(Math.random() * (150 - 100 + 1)) + 100;
+    } else {
+        // 12+ months (1+ year): 175 attack (fixed)
+        return 175;
+    }
+}
 let featureUI = [];
 let cooldowns = {
     feature1: 0,
@@ -105,12 +143,22 @@ async function create() {
     
     console.log('✅ Monster loaded:', monsterData);
 
+    // Calculate stats based on streak
+    const streakDays = monsterData.streak || 0;
+    const calculatedHP = calculateHP(streakDays);
+    const calculatedAttack = calculateAttack(streakDays);
+    
+    console.log(`📊 Stats for ${streakDays} day streak:`);
+    console.log(`   HP: ${calculatedHP} (${Math.floor(streakDays/30)} months)`);
+    console.log(`   Attack: ${calculatedAttack}`);
+
     // Setup character data from Firebase monster
     characterData = {
-        hp: 150,
-        maxHp: 150,
-        attack: 50,
+        hp: calculatedHP,
+        maxHp: calculatedHP,
+        attack: calculatedAttack,
         scale: 1,
+        streak: streakDays,
         med_name: monsterData.med_name,
         feature_1: monsterData.feature_1 || 'fireball',
         feature_2: monsterData.feature_2 || 'shield',
@@ -318,14 +366,14 @@ function createTrees(scene) {
         tree.body.moves = false; // Tree body is completely static
         tree.body.allowGravity = false;
         
-        // Reduce bounding box to 75% while keeping visual scale
+        // Reduce bounding box to 50% while keeping visual scale
         tree.body.setSize(
-            tree.width * 0.75,
-            tree.height * 0.75
+            tree.width * 0.5,
+            tree.height * 0.5
         );
         tree.body.setOffset(
-            tree.width * 0.125,  // Center the smaller hitbox
-            tree.height * 0.125
+            tree.width * 0.25,  // Center the smaller hitbox
+            tree.height * 0.25
         );
         
         // Add subtle scale animation (breathing effect)
@@ -423,14 +471,14 @@ function createBoulders(scene) {
         boulder.body.moves = false; // Boulder body is completely static
         boulder.body.allowGravity = false;
         
-        // Reduce bounding box to 75% while keeping visual scale
+        // Reduce bounding box to 50% while keeping visual scale
         boulder.body.setSize(
-            boulder.width * 0.75,
-            boulder.height * 0.75
+            boulder.width * 0.5,
+            boulder.height * 0.5
         );
         boulder.body.setOffset(
-            boulder.width * 0.125,  // Center the smaller hitbox
-            boulder.height * 0.125
+            boulder.width * 0.25,  // Center the smaller hitbox
+            boulder.height * 0.25
         );
         
         // Add to boulders array
@@ -516,9 +564,11 @@ function createControlsUI(scene) {
 }
 
 function createFeatureUI(scene) {
-    const startX = scene.scale.width - 190;
-    const startY = scene.scale.height - 240;
-    const spacing = 80;
+    const containerWidth = 350;  // Even larger for longer text
+    const containerHeight = 110;  // Taller for multiple lines
+    const startX = scene.scale.width - (containerWidth / 2) - 25;  // More margin from edge
+    const startY = scene.scale.height - 350;  // Move higher up
+    const spacing = 120;  // More spacing between containers
 
     const features = [
         { name: characterData.feature_1, reason: characterData.feature_1_reason, key: '1' },
@@ -529,28 +579,28 @@ function createFeatureUI(scene) {
     features.forEach((feature, index) => {
         const y = startY + (index * spacing);
         
-        const bg = scene.add.rectangle(startX, y, 180, 70, 0x333333, 0.8);
+        const bg = scene.add.rectangle(startX, y, containerWidth, containerHeight, 0x333333, 0.8);
         
-        const keyText = scene.add.text(startX - 80, y - 20, `[${feature.key}]`, {
-            fontSize: '16px',
+        const keyText = scene.add.text(startX - (containerWidth/2) + 15, y - 40, `[${feature.key}]`, {
+            fontSize: '18px',
             fill: '#ffff00',
             fontStyle: 'bold'
         });
         
-        const nameText = scene.add.text(startX - 80, y, feature.name.replace('_', ' ').toUpperCase(), {
-            fontSize: '14px',
+        const nameText = scene.add.text(startX - (containerWidth/2) + 15, y - 15, feature.name.replace('_', ' ').toUpperCase(), {
+            fontSize: '15px',  // Slightly smaller to fit better
             fill: '#ffffff',
             fontStyle: 'bold'
         });
         
-        const reasonText = scene.add.text(startX - 80, y + 20, feature.reason, {
-            fontSize: '10px',
+        const reasonText = scene.add.text(startX - (containerWidth/2) + 15, y + 8, feature.reason, {
+            fontSize: '12px',  // Adjusted for better fit
             fill: '#aaaaaa',
-            wordWrap: { width: 160 }
+            wordWrap: { width: containerWidth - 30 }  // More generous wrap width
         });
         
-        const cooldownText = scene.add.text(startX + 70, y, '', {
-            fontSize: '12px',
+        const cooldownText = scene.add.text(startX + (containerWidth/2) - 40, y - 15, '', {
+            fontSize: '14px',
             fill: '#ff0000',
             fontStyle: 'bold'
         });
@@ -588,6 +638,19 @@ function createStatsUI(scene) {
     title.setScrollFactor(0);
     minimap.ignore(title);
     
+    // Add medicine name at center top
+    const centerX = scene.scale.width / 2;
+    const medicineNameText = scene.add.text(centerX, 20, characterData.med_name, {
+        fontSize: '28px',
+        fill: '#2c3e50',  // Dark blue-gray
+        fontStyle: 'bold',
+        stroke: '#ffffff',  // White outline
+        strokeThickness: 2
+    });
+    medicineNameText.setOrigin(0.5, 0);  // Center horizontally, top aligned
+    medicineNameText.setScrollFactor(0);
+    minimap.ignore(medicineNameText);
+    
     characterData.hpText = scene.add.text(statsX, statsY + 30, `HP: ${characterData.hp}/${characterData.maxHp}`, {
         fontSize: '16px',
         fill: '#ff0000'  // Red for HP
@@ -602,12 +665,21 @@ function createStatsUI(scene) {
     characterData.attackText.setScrollFactor(0);
     minimap.ignore(characterData.attackText);
     
-    characterData.hpBar = scene.add.rectangle(statsX, statsY + 85, 200, 20, 0x00ff00);
+    // Add streak information
+    const streakMonths = Math.floor(characterData.streak / 30);
+    const streakText = scene.add.text(statsX, statsY + 80, `Streak: ${characterData.streak} days (${streakMonths} months)`, {
+        fontSize: '14px',
+        fill: '#00ccff'  // Cyan for streak
+    });
+    streakText.setScrollFactor(0);
+    minimap.ignore(streakText);
+    
+    characterData.hpBar = scene.add.rectangle(statsX, statsY + 105, 200, 20, 0x00ff00);
     characterData.hpBar.setOrigin(0, 0.5);
     characterData.hpBar.setScrollFactor(0);
     minimap.ignore(characterData.hpBar);
     
-    const hpBarBg = scene.add.rectangle(statsX, statsY + 85, 200, 20, 0x333333);
+    const hpBarBg = scene.add.rectangle(statsX, statsY + 105, 200, 20, 0x333333);
     hpBarBg.setOrigin(0, 0.5);
     hpBarBg.setDepth(-1);
     hpBarBg.setScrollFactor(0);
