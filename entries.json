@@ -1,0 +1,52 @@
+[
+  {
+    "med_name": "Claritinex Forte",
+    "med_desc": "A potent anti-inflammatory that purifies the system. Its Clarity effects cleanse negative energies and ignore all lingering status debuffs on the target, delivering reliable, unmitigated damage.",
+    "streak": 55
+  },
+  {
+    "med_name": "Nitro-Boost 400mg",
+    "med_desc": "A high-octane stimulant that pushes the user to the limit. Its Overload effect grants a powerful burst of burst damage but temporarily reduces the user's defensive capabilities due to the subsequent crash.",
+    "streak": 14
+  },
+  {
+    "med_name": "Somnilax Ultra",
+    "med_desc": "A deep anesthetic designed for quick, restful sedation. Its Drain/Lethargy effect siphons mental energy from the target, inflicting a Drowsiness status and replenishing a fraction of the user's own health.",
+    "streak": 90
+  },
+  {
+    "med_name": "Kardio-Guard 80",
+    "med_desc": "A dedicated beta-blocker that creates a defensive field. Its Block/Barrier properties generate a shimmering, reflective shield that absorbs incoming damage and returns a minor counter-shock to the attacker.",
+    "streak": 21
+  },
+  {
+    "med_name": "Vita-Complex Z",
+    "med_desc": "A broad-spectrum multivitamin that promotes rapid recovery. Its Mend/Support power releases a gentle, restorative aura, immediately cleansing minor status ailments and providing sustained, gentle healing.",
+    "streak": 365
+  },
+  {
+    "med_name": "Ferro-Poison",
+    "med_desc": "A synthetic toxin often used in specialized medical environments. Its Overload effect applies a rapidly spreading, corrosive Burn over time, dealing continuous damage that bypasses external shields.",
+    "streak": 7
+  },
+  {
+    "med_name": "Acu-Shield Pro",
+    "med_desc": "A next-generation antihistamine that solidifies the immune response. Its Block/Barrier ability creates a near-impenetrable wall of energy, maximizing defense at the cost of mobility.",
+    "streak": 180
+  },
+  {
+    "med_name": "Neo-Penicillin 50",
+    "med_desc": "A foundational antibiotic used to fight invasive entities. Its Purity/Clarity effect targets contaminants with absolute precision, delivering high, surgical-grade damage to a single foe.",
+    "streak": 62
+  },
+  {
+    "med_name": "Tranquil-Haze",
+    "med_desc": "An advanced sedative mist for nervous system regulation. Its Drain/Lethargy effect projects a calming, heavy fog that inflicts the Slow status on all targets within the cloud's radius, making them susceptible to follow-up attacks.",
+    "streak": 45
+  },
+  {
+    "med_name": "Roto-Heal Patch",
+    "med_desc": "An emergency dermal patch containing concentrated healing compounds. Its Mend/Support action creates an immediate, concentrated burst of regenerative light, providing maximum single-target health recovery.",
+    "streak": 30
+  }
+]

@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "generate": "node generate-image-node.js",
+    "load-character": "node load-character.js",
+    "process-features": "node process-features.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -19,6 +21,7 @@
   "license": "ISC",
   "dependencies": {
     "@google/genai": "^0.3.1",
+    "firebase": "^12.3.0",
     "sharp": "^0.34.4"
   }
 }

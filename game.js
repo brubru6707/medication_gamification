@@ -1,17 +1,18 @@
-// Medication Gamification - Phaser Game with Gemini-Generated Characters
-// Now with 2.5D perspective, idle animations, and camera rotation!
-
 const config = {
     type: Phaser.AUTO,
-    width: 800,
-    height: 600,
-    backgroundColor: '#87CEEB',
+    width: window.innerWidth,
+    height: window.innerHeight,
+    backgroundColor: '#ffffff',  // White background
     physics: {
         default: 'arcade',
         arcade: {
-            gravity: { y: 300 },
+            gravity: { y: 0 },
             debug: false
         }
+    },
+    scale: {
+        mode: Phaser.Scale.RESIZE,
+        autoCenter: Phaser.Scale.CENTER_BOTH
     },
     scene: {
         preload: preload,
@@ -24,391 +25,594 @@ const game = new Phaser.Game(config);
 
 let character;
 let cursors;
-let scoreText;
-let score = 0;
-let currentCharacter = 'robitussin'; // Default character
+let keys;
+let characterData;
+let featureUI = [];
+let cooldowns = {
+    feature1: 0,
+    feature2: 0,
+    feature3: 0
+};
+let activeEffects = {
+    shield: false,
+    poisoned: false,
+    healing: false
+};
+let projectiles;
+let minimap;  // For minimap camera
 
-// Idle animation variables
-let idleTimer = 0;
-let isIdle = false;
-let idleAnimProgress = 0;
-let bobDirection = 1;
-let squishPhase = 0;
+const WORLD_WIDTH = 3000;
+const WORLD_HEIGHT = 3000;
 
-// Camera rotation variables
-let cameraAngle = 0;
-let platforms;
-let isDragging = false;
-let lastPointerX = 0;
+const FEATURE_COLORS = {
+    'fireball': 0xff4500,
+    'black_smoke': 0x1a1a1a,
+    'poison_droplets': 0x00ff00,
+    'shield': 0x00ffff,
+    'yellow_cloud': 0xffff00
+};
 
-// Create placeholder graphics only if sprites aren't loaded
-function createPlaceholderGraphics(scene) {
-    // Only create if the sprites don't exist
+function createPlatformGraphics(scene) {
     if (!scene.textures.exists('platform')) {
-        // Create 3D-looking platform with depth
-        const platformGraphics = scene.add.graphics();
-        
-        // Top surface (bright green)
-        platformGraphics.fillStyle(0x00DD00, 1);
-        platformGraphics.fillRect(0, 0, 400, 32);
-        
-        // Front face (darker green for 3D effect)
-        platformGraphics.fillStyle(0x009900, 1);
-        platformGraphics.beginPath();
-        platformGraphics.moveTo(0, 32);
-        platformGraphics.lineTo(20, 42);
-        platformGraphics.lineTo(420, 42);
-        platformGraphics.lineTo(400, 32);
-        platformGraphics.closePath();
-        platformGraphics.fillPath();
-        
-        // Right side (darkest green)
-        platformGraphics.fillStyle(0x006600, 1);
-        platformGraphics.beginPath();
-        platformGraphics.moveTo(400, 0);
-        platformGraphics.lineTo(420, 10);
-        platformGraphics.lineTo(420, 42);
-        platformGraphics.lineTo(400, 32);
-        platformGraphics.closePath();
-        platformGraphics.fillPath();
-        
-        platformGraphics.generateTexture('platform', 420, 42);
-        platformGraphics.destroy();
+        const graphics = scene.add.graphics();
+        graphics.fillStyle(0x00DD00, 1);
+        graphics.fillRect(0, 0, 400, 32);
+        graphics.generateTexture('platform', 400, 32);
+        graphics.destroy();
     }
 }
 
 function preload() {
-    // Load your Gemini-generated character images with transparent backgrounds!
-    // These are the processed sprites with white backgrounds removed
+    this.load.image('character', 'robitussin-sprite.png');
     
-    this.load.image('robitussin', 'robitussin-sprite.png');
-    this.load.image('albuterol', 'albuterol-sprite.png');
+    // Feature sprites
+    this.load.image('fireball', 'assets/features/fireball.png');
+    this.load.image('black_smoke', 'assets/features/black_smoke.png');
+    this.load.image('poison_droplets', 'assets/features/posion_dropplets.png');
+    this.load.image('shield', 'assets/features/shield.png');
+    this.load.image('yellow_cloud', 'assets/features/yellow_cloud.png');
     
-    // You can add more characters as you generate them
-    // this.load.image('mucinex', 'mucinex-sprite.png');
-    // this.load.image('vitamin-c', 'vitamin-c-sprite.png');
-    
-    // Create platform graphics procedurally (no need to load)
-    // This happens in create() function
+    // Tree sprites
+    this.load.image('long_tree', 'assets/surroundings/long_tree.png');
+    this.load.image('red_tree', 'assets/surroundings/red_tree.png');
+    this.load.image('regular_tree', 'assets/surroundings/regular_tree.png');
 }
 
 function create() {
-    // Add title with 3D text effect
-    const titleShadow = this.add.text(403, 33, 'Medication Gamification', {
-        fontSize: '32px',
-        fill: '#000',
-        fontStyle: 'bold'
-    });
-    titleShadow.setOrigin(0.5);
-    titleShadow.setAlpha(0.3);
+    // Set world bounds to 3000x3000
+    this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     
-    const title = this.add.text(400, 30, 'Medication Gamification', {
-        fontSize: '32px',
-        fill: '#fff',
-        fontStyle: 'bold',
-        stroke: '#000',
-        strokeThickness: 4
-    });
-    title.setOrigin(0.5);
+    const centerX = WORLD_WIDTH / 2;
+    const centerY = WORLD_HEIGHT / 2;
 
-    // Create platform graphics if needed
-    createPlaceholderGraphics(this);
+    characterData = {
+        hp: 150,
+        maxHp: 150,
+        attack: 50,
+        scale: 1,
+        feature_1: 'fireball',
+        feature_2: 'shield',
+        feature_3: 'yellow_cloud',
+        feature_1_reason: 'High burst damage for offensive power',
+        feature_2_reason: 'Defensive protection during combat',
+        feature_3_reason: 'Healing support for sustainability'
+    };
 
-    // Add 3D-style platforms with depth
-    platforms = this.physics.add.staticGroup();
-    
-    // Ground - with 3D offset
-    const ground = platforms.create(400, 568, 'platform');
-    ground.setScale(2, 1).refreshBody();
-    ground.setDepth(0);
-    ground.originalScaleX = 2;
-    ground.originalScaleY = 1;
-    
-    // Ledges with 3D positioning
-    const ledge1 = platforms.create(600, 400, 'platform');
-    ledge1.setScale(0.5, 1);
-    ledge1.setDepth(1);
-    ledge1.originalScaleX = 0.5;
-    ledge1.originalScaleY = 1;
-    
-    const ledge2 = platforms.create(50, 250, 'platform');
-    ledge2.setScale(0.5, 1);
-    ledge2.setDepth(2);
-    ledge2.originalScaleX = 0.5;
-    ledge2.originalScaleY = 1;
-    
-    const ledge3 = platforms.create(750, 220, 'platform');
-    ledge3.setScale(0.5, 1);
-    ledge3.setDepth(1);
-    ledge3.originalScaleX = 0.5;
-    ledge3.originalScaleY = 1;
-
-    // Add character to the game (using your Gemini-generated sprite!)
-    character = this.physics.add.sprite(100, 450, currentCharacter);
-    
-    // Scale the character appropriately
-    character.setScale(0.08);
-    character.originalScale = 0.08; // Store original scale for animations
-    
-    // Set character properties
-    character.setBounce(0.2);
+    character = this.physics.add.sprite(centerX, centerY, 'character');
+    character.setScale(0.08 * characterData.scale);
     character.setCollideWorldBounds(true);
-    character.setDepth(10); // Always on top
+    
+    // Camera follows character
+    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    this.cameras.main.startFollow(character, true, 0.1, 0.1);
+    this.cameras.main.setZoom(1);
+    
+    // Create minimap in top-right corner
+    createMinimap(this);
 
-    // Collider
-    this.physics.add.collider(character, platforms);
+    projectiles = this.physics.add.group();
+    
+    // Create random trees throughout the world
+    createTrees(this);
 
-    // Controls
     cursors = this.input.keyboard.createCursorKeys();
-    
-    // Mouse drag for camera rotation (2.5D panning)
-    this.input.on('pointerdown', (pointer) => {
-        isDragging = true;
-        lastPointerX = pointer.x;
-    });
-    
-    this.input.on('pointermove', (pointer) => {
-        if (isDragging) {
-            const deltaX = pointer.x - lastPointerX;
-            cameraAngle += deltaX * 0.005; // Sensitivity control
-            lastPointerX = pointer.x;
-        }
-    });
-    
-    this.input.on('pointerup', () => {
-        isDragging = false;
-    });
-    
-    this.input.on('pointerout', () => {
-        isDragging = false;
+    keys = this.input.keyboard.addKeys({
+        one: Phaser.Input.Keyboard.KeyCodes.ONE,
+        two: Phaser.Input.Keyboard.KeyCodes.TWO,
+        three: Phaser.Input.Keyboard.KeyCodes.THREE
     });
 
-    // Score text
-    scoreText = this.add.text(16, 16, 'Adherence Score: 0', {
-        fontSize: '18px',
-        fill: '#000'
-    });
+    createControlsUI(this);
+    createFeatureUI(this);
+    createStatsUI(this);
 
-    // Instructions with 2.5D controls
-    const instructions = this.add.text(400, 100, 'Arrow Keys: Move & Jump\nMouse Drag: Rotate Camera', {
-        fontSize: '16px',
-        fill: '#fff',
-        align: 'center',
-        stroke: '#000',
-        strokeThickness: 3
-    });
-    instructions.setOrigin(0.5);
-
-    // Character selection instructions
-    const charText = this.add.text(400, 580, 'Press 1: Robitussin  |  Press 2: Albuterol', {
-        fontSize: '14px',
-        fill: '#fff',
-        backgroundColor: '#000',
-        padding: { x: 10, y: 5 }
-    });
-    charText.setOrigin(0.5);
-
-    // Keyboard for character switching
-    this.input.keyboard.on('keydown-ONE', () => switchCharacter(this, 'robitussin'));
-    this.input.keyboard.on('keydown-TWO', () => switchCharacter(this, 'albuterol'));
-
-    // Example: Add collectible items (generate these with Gemini too!)
-    // const pills = this.physics.add.group({
-    //     key: 'pill',
-    //     repeat: 11,
-    //     setXY: { x: 12, y: 0, stepX: 70 }
-    // });
+    this.input.keyboard.on('keydown-ONE', () => activateFeature(this, 1));
+    this.input.keyboard.on('keydown-TWO', () => activateFeature(this, 2));
+    this.input.keyboard.on('keydown-THREE', () => activateFeature(this, 3));
 }
 
-function switchCharacter(scene, characterName) {
-    if (scene.textures.exists(characterName)) {
-        currentCharacter = characterName;
-        character.setTexture(characterName);
-        console.log(`✅ Switched to ${characterName}`);
+function createTrees(scene) {
+    const treeTypes = ['long_tree', 'red_tree', 'regular_tree'];
+    const numTrees = 25; // Increased number of trees
+    const trees = []; // Track all tree positions
+    const minDistance = 200; // Minimum distance between trees
+    
+    let attempts = 0;
+    const maxAttempts = 500; // Prevent infinite loop
+    
+    while (trees.length < numTrees && attempts < maxAttempts) {
+        attempts++;
+        
+        // Random position across the full 3000x3000 world
+        const x = Phaser.Math.Between(300, WORLD_WIDTH - 300);
+        const y = Phaser.Math.Between(300, WORLD_HEIGHT - 300);
+        
+        // Check if position is too close to existing trees
+        let tooClose = false;
+        for (let existingTree of trees) {
+            const distance = Phaser.Math.Distance.Between(x, y, existingTree.x, existingTree.y);
+            if (distance < minDistance) {
+                tooClose = true;
+                break;
+            }
+        }
+        
+        // Skip this position if too close to existing tree
+        if (tooClose) continue;
+        
+        // Random tree type
+        const treeType = Phaser.Math.RND.pick(treeTypes);
+        
+        // Random scale between 1.5 and 3.5 (larger trees)
+        const scale = Phaser.Math.FloatBetween(1.5, 3.5);
+        
+        // Create tree sprite with physics
+        const tree = scene.physics.add.sprite(x, y, treeType);
+        tree.setScale(scale * 0.1); // Scale down from 1024px original size
+        tree.setDepth(-1); // Place behind character
+        tree.setImmovable(true); // Trees don't move when hit
+        tree.body.allowGravity = false;
+        
+        // Add to trees array
+        trees.push(tree);
+    }
+    
+    // Store trees in scene for collision detection
+    scene.trees = scene.physics.add.group();
+    trees.forEach(tree => scene.trees.add(tree));
+    
+    // Add collision between character and trees
+    scene.physics.add.collider(character, scene.trees);
+}
+
+function createMinimap(scene) {
+    // Create a minimap camera
+    const minimapWidth = 200;
+    const minimapHeight = 200;
+    const padding = 10;
+    
+    minimap = scene.cameras.add(
+        scene.scale.width - minimapWidth - padding,  // x position (top-right)
+        padding,  // y position
+        minimapWidth,
+        minimapHeight
+    );
+    
+    // Set the minimap to view the entire world
+    minimap.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    minimap.setZoom(minimapWidth / WORLD_WIDTH);  // Zoom to fit entire world
+    minimap.setBackgroundColor(0xcccccc);  // Light gray background
+    
+    // Add border around minimap
+    const border = scene.add.graphics();
+    border.lineStyle(2, 0x000000, 1);
+    border.strokeRect(
+        scene.scale.width - minimapWidth - padding,
+        padding,
+        minimapWidth,
+        minimapHeight
+    );
+    border.setScrollFactor(0);  // Fixed to screen
+    border.setDepth(1000);  // On top of everything
+    minimap.ignore(border);  // Don't show border in minimap
+}
+
+function createControlsUI(scene) {
+    const controlsX = 20;
+    const controlsY = 150;
+    
+    const title = scene.add.text(controlsX, controlsY, 'CONTROLS', {
+        fontSize: '18px',
+        fill: '#000000',  // Black text
+        fontStyle: 'bold'
+    });
+    title.setScrollFactor(0);
+    minimap.ignore(title);
+    
+    const move = scene.add.text(controlsX, controlsY + 30, '↑↓←→ Move', {
+        fontSize: '14px',
+        fill: '#333333'
+    });
+    move.setScrollFactor(0);
+    minimap.ignore(move);
+    
+    const features = scene.add.text(controlsX, controlsY + 55, '1/2/3 Use Features', {
+        fontSize: '14px',
+        fill: '#333333'
+    });
+    features.setScrollFactor(0);
+    minimap.ignore(features);
+    
+    const aim = scene.add.text(controlsX, controlsY + 80, 'Aim with arrows', {
+        fontSize: '12px',
+        fill: '#666666'
+    });
+    aim.setScrollFactor(0);
+    minimap.ignore(aim);
+}
+
+function createFeatureUI(scene) {
+    const startX = scene.scale.width - 190;
+    const startY = scene.scale.height - 240;
+    const spacing = 80;
+
+    const features = [
+        { name: characterData.feature_1, reason: characterData.feature_1_reason, key: '1' },
+        { name: characterData.feature_2, reason: characterData.feature_2_reason, key: '2' },
+        { name: characterData.feature_3, reason: characterData.feature_3_reason, key: '3' }
+    ];
+
+    features.forEach((feature, index) => {
+        const y = startY + (index * spacing);
+        
+        const bg = scene.add.rectangle(startX, y, 180, 70, 0x333333, 0.8);
+        
+        const keyText = scene.add.text(startX - 80, y - 20, `[${feature.key}]`, {
+            fontSize: '16px',
+            fill: '#ffff00',
+            fontStyle: 'bold'
+        });
+        
+        const nameText = scene.add.text(startX - 80, y, feature.name.replace('_', ' ').toUpperCase(), {
+            fontSize: '14px',
+            fill: '#ffffff',
+            fontStyle: 'bold'
+        });
+        
+        const reasonText = scene.add.text(startX - 80, y + 20, feature.reason, {
+            fontSize: '10px',
+            fill: '#aaaaaa',
+            wordWrap: { width: 160 }
+        });
+        
+        const cooldownText = scene.add.text(startX + 70, y, '', {
+            fontSize: '12px',
+            fill: '#ff0000',
+            fontStyle: 'bold'
+        });
+        
+        featureUI.push({
+            bg,
+            keyText,
+            nameText,
+            reasonText,
+            cooldownText,
+            feature: feature.name
+        });
+        
+        // Set all UI elements to not scroll with camera AND ignore minimap
+        bg.setScrollFactor(0);
+        keyText.setScrollFactor(0);
+        nameText.setScrollFactor(0);
+        reasonText.setScrollFactor(0);
+        cooldownText.setScrollFactor(0);
+        
+        // Ignore minimap camera
+        minimap.ignore([bg, keyText, nameText, reasonText, cooldownText]);
+    });
+}
+
+function createStatsUI(scene) {
+    const statsX = 20;
+    const statsY = 20;
+    
+    const title = scene.add.text(statsX, statsY, 'STATS', {
+        fontSize: '20px',
+        fill: '#000000',  // Black text
+        fontStyle: 'bold'
+    });
+    title.setScrollFactor(0);
+    minimap.ignore(title);
+    
+    characterData.hpText = scene.add.text(statsX, statsY + 30, `HP: ${characterData.hp}/${characterData.maxHp}`, {
+        fontSize: '16px',
+        fill: '#ff0000'  // Red for HP
+    });
+    characterData.hpText.setScrollFactor(0);
+    minimap.ignore(characterData.hpText);
+    
+    characterData.attackText = scene.add.text(statsX, statsY + 55, `ATK: ${characterData.attack}`, {
+        fontSize: '16px',
+        fill: '#ff6600'  // Orange for attack
+    });
+    characterData.attackText.setScrollFactor(0);
+    minimap.ignore(characterData.attackText);
+    
+    characterData.hpBar = scene.add.rectangle(statsX, statsY + 85, 200, 20, 0x00ff00);
+    characterData.hpBar.setOrigin(0, 0.5);
+    characterData.hpBar.setScrollFactor(0);
+    minimap.ignore(characterData.hpBar);
+    
+    const hpBarBg = scene.add.rectangle(statsX, statsY + 85, 200, 20, 0x333333);
+    hpBarBg.setOrigin(0, 0.5);
+    hpBarBg.setDepth(-1);
+    hpBarBg.setScrollFactor(0);
+    minimap.ignore(hpBarBg);
+}
+
+function activateFeature(scene, featureNum) {
+    const featureKey = `feature${featureNum}`;
+    
+    if (cooldowns[featureKey] > 0) {
+        console.log(`Feature ${featureNum} on cooldown!`);
+        return;
+    }
+    
+    const featureName = characterData[`feature_${featureNum}`];
+    
+    console.log(`Activating: ${featureName}`);
+    
+    switch(featureName) {
+        case 'fireball':
+            shootProjectile(scene, 'fireball', characterData.attack, 0xff0000);
+            cooldowns[featureKey] = 5;
+            break;
+            
+        case 'black_smoke':
+            shootProjectile(scene, 'black_smoke', characterData.attack * 0.75, 0x333333);
+            cooldowns[featureKey] = 5;
+            break;
+            
+        case 'poison_droplets':
+            shootProjectile(scene, 'poison_droplets', 0, 0x00ff00);
+            cooldowns[featureKey] = 5;
+            break;
+            
+        case 'shield':
+            activateShield(scene);
+            cooldowns[featureKey] = 5;
+            break;
+            
+        case 'yellow_cloud':
+            activateHealing(scene);
+            cooldowns[featureKey] = 13;
+            break;
+    }
+}
+
+function shootProjectile(scene, type, damage, color) {
+    let direction = { x: 0, y: 0 };
+    
+    if (cursors.up.isDown) {
+        direction = { x: 0, y: -1 };
+    } else if (cursors.down.isDown) {
+        direction = { x: 0, y: 1 };
+    } else if (cursors.left.isDown) {
+        direction = { x: -1, y: 0 };
+    } else if (cursors.right.isDown) {
+        direction = { x: 1, y: 0 };
     } else {
-        console.log(`⚠️ Character ${characterName} not loaded. Generate it first!`);
+        direction = { x: 1, y: 0 };
+    }
+    
+    console.log('Shooting projectile:', type, 'Direction:', direction);
+    
+    // Create projectile sprite (not physics sprite yet)
+    let projectile = scene.add.sprite(character.x, character.y, type);
+    
+    // Configure sprite appearance
+    if (type === 'fireball') {
+        projectile.setScale(0.05);
+        projectile.setTint(0xff4500);
+    } else if (type === 'black_smoke') {
+        projectile.setScale(0.05);
+        projectile.setAlpha(0.8);
+    } else if (type === 'poison_droplets') {
+        projectile.setScale(0.04);
+    }
+    
+    // Add physics body
+    scene.physics.world.enable(projectile);
+    
+    // Set velocity to shoot the projectile
+    projectile.body.setVelocity(direction.x * 400, direction.y * 400);
+    
+    console.log('Projectile velocity set:', projectile.body.velocity);
+    
+    projectile.projectileType = type;
+    projectile.damage = damage;
+    
+    // Add collision with trees - projectile disappears when hitting tree
+    if (scene.trees) {
+        scene.physics.add.overlap(projectile, scene.trees, (proj, tree) => {
+            proj.destroy();
+            const index = scene.activeProjectiles.indexOf(proj);
+            if (index > -1) {
+                scene.activeProjectiles.splice(index, 1);
+            }
+        });
+    }
+    
+    // Store projectile reference
+    if (!scene.activeProjectiles) {
+        scene.activeProjectiles = [];
+    }
+    scene.activeProjectiles.push(projectile);
+    
+    // Destroy after 3 seconds
+    scene.time.delayedCall(3000, () => {
+        if (projectile && projectile.active) {
+            projectile.destroy();
+            const index = scene.activeProjectiles.indexOf(projectile);
+            if (index > -1) {
+                scene.activeProjectiles.splice(index, 1);
+            }
+        }
+    });
+}
+
+function activateShield(scene) {
+    if (activeEffects.shieldSprite) {
+        activeEffects.shieldSprite.destroy();
+    }
+    
+    activeEffects.shield = true;
+    activeEffects.shieldSprite = scene.add.sprite(character.x, character.y, 'shield');
+    activeEffects.shieldSprite.setScale(0.12);
+    activeEffects.shieldSprite.setAlpha(0.7);
+    
+    const text = scene.add.text(character.x, character.y - 80, 'INVINCIBLE!', {
+        fontSize: '16px',
+        fill: '#00ffff',
+        fontStyle: 'bold'
+    });
+    text.setOrigin(0.5);
+    
+    // Pulsing effect only (no rotation)
+    scene.tweens.add({
+        targets: activeEffects.shieldSprite,
+        alpha: 0.4,
+        scaleX: 0.14,
+        scaleY: 0.14,
+        duration: 500,
+        yoyo: true,
+        repeat: -1
+    });
+    
+    scene.time.delayedCall(5000, () => {
+        activeEffects.shield = false;
+        if (activeEffects.shieldSprite) {
+            activeEffects.shieldSprite.destroy();
+            activeEffects.shieldSprite = null;
+        }
+        text.destroy();
+    });
+}
+
+function activateHealing(scene) {
+    if (activeEffects.healingSprite) {
+        activeEffects.healingSprite.destroy();
+    }
+    
+    activeEffects.healing = true;
+    activeEffects.healingSprite = scene.add.sprite(character.x, character.y, 'yellow_cloud');
+    activeEffects.healingSprite.setScale(0.1);
+    activeEffects.healingSprite.setAlpha(0.5);
+    
+    const text = scene.add.text(character.x, character.y - 80, 'HEALING...', {
+        fontSize: '16px',
+        fill: '#ffff00',
+        fontStyle: 'bold'
+    });
+    text.setOrigin(0.5);
+    
+    // Pulsing effect only (no rotation)
+    scene.tweens.add({
+        targets: activeEffects.healingSprite,
+        scaleX: 0.13,
+        scaleY: 0.13,
+        alpha: 0.3,
+        duration: 1000,
+        yoyo: true,
+        repeat: -1
+    });
+    
+    scene.time.delayedCall(13000, () => {
+        characterData.hp = characterData.maxHp;
+        updateStatsUI();
+        
+        const healText = scene.add.text(character.x, character.y - 80, 'FULL HP!', {
+            fontSize: '20px',
+            fill: '#00ff00',
+            fontStyle: 'bold'
+        });
+        healText.setOrigin(0.5);
+        
+        scene.tweens.add({
+            targets: healText,
+            y: character.y - 120,
+            alpha: 0,
+            duration: 1000,
+            onComplete: () => healText.destroy()
+        });
+        
+        activeEffects.healing = false;
+        if (activeEffects.healingSprite) {
+            activeEffects.healingSprite.destroy();
+            activeEffects.healingSprite = null;
+        }
+        text.destroy();
+    });
+}
+
+function updateStatsUI() {
+    if (characterData.hpText) {
+        characterData.hpText.setText(`HP: ${Math.floor(characterData.hp)}/${characterData.maxHp}`);
+        
+        const hpPercent = characterData.hp / characterData.maxHp;
+        characterData.hpBar.width = 200 * hpPercent;
+        
+        if (hpPercent > 0.5) {
+            characterData.hpBar.setFillStyle(0x00ff00);
+        } else if (hpPercent > 0.25) {
+            characterData.hpBar.setFillStyle(0xffff00);
+        } else {
+            characterData.hpBar.setFillStyle(0xff0000);
+        }
     }
 }
 
 function update(time, delta) {
-    const deltaSeconds = delta / 1000; // Convert to seconds
-    
-    // === CAMERA ROTATION (2.5D Effect) ===
-    // No keyboard rotation - handled by mouse drag in create()
-    
-    // Apply 2.5D perspective effect to platforms
-    platforms.children.entries.forEach((platform, index) => {
-        const baseDepth = platform.getData('baseDepth') || platform.depth;
-        platform.setData('baseDepth', baseDepth);
-        
-        // Calculate 3D offset based on camera angle and depth
-        const depthOffset = (baseDepth + 1) * 30;
-        const xOffset = Math.sin(cameraAngle) * depthOffset;
-        const yOffset = Math.cos(cameraAngle) * 10 * (baseDepth + 1);
-        
-        // Store original position once
-        if (!platform.getData('originalX')) {
-            platform.setData('originalX', platform.x);
-            platform.setData('originalY', platform.y);
-        }
-        
-        // Apply position offset
-        platform.x = platform.getData('originalX') + xOffset;
-        platform.y = platform.getData('originalY') + yOffset;
-        
-        // Apply scale based on original scale (don't accumulate!)
-        const scaleEffect = 1 - (Math.abs(Math.sin(cameraAngle)) * 0.1);
-        platform.setScale(
-            platform.originalScaleX * scaleEffect,
-            platform.originalScaleY
-        );
-    });
-    
-    // === CHARACTER MOVEMENT ===
-    const isMoving = cursors.left.isDown || cursors.right.isDown || cursors.up.isDown;
+    const speed = 200;
     
     if (cursors.left.isDown) {
-        character.setVelocityX(-160);
+        character.setVelocityX(-speed);
         character.flipX = true;
-        idleTimer = 0; // Reset idle timer
-        isIdle = false;
-        idleAnimProgress = 0;
-    }
-    else if (cursors.right.isDown) {
-        character.setVelocityX(160);
+    } else if (cursors.right.isDown) {
+        character.setVelocityX(speed);
         character.flipX = false;
-        idleTimer = 0;
-        isIdle = false;
-        idleAnimProgress = 0;
-    }
-    else {
+    } else {
         character.setVelocityX(0);
     }
-
-    // Jump
-    if (cursors.up.isDown && character.body.touching.down) {
-        character.setVelocityY(-330);
-        idleTimer = 0;
-        isIdle = false;
-        idleAnimProgress = 0;
-    }
     
-    // === IDLE ANIMATION SYSTEM ===
-    if (!isMoving && character.body.touching.down) {
-        idleTimer += deltaSeconds;
-        
-        // Start idle animation after 1 second
-        if (idleTimer > 1.0) {
-            if (!isIdle) {
-                isIdle = true;
-                idleAnimProgress = 0;
-            }
-            
-            // Gradually build up the idle animation
-            if (idleAnimProgress < 1.0) {
-                idleAnimProgress += deltaSeconds * 0.5; // Build up over 2 seconds
-                idleAnimProgress = Math.min(idleAnimProgress, 1.0);
-            }
-            
-            // Apply idle animations
-            applyIdleAnimation(time, idleAnimProgress);
-        } else {
-            // Reset to normal state if not idle long enough
-            character.setScale(character.originalScale);
-            character.y = character.y; // Keep current y position
-        }
+    if (cursors.up.isDown) {
+        character.setVelocityY(-speed);
+    } else if (cursors.down.isDown) {
+        character.setVelocityY(speed);
     } else {
-        // Reset idle state when moving
-        idleTimer = 0;
-        isIdle = false;
-        idleAnimProgress = 0;
-        character.setScale(character.originalScale);
-    }
-}
-
-/**
- * Apply idle animation effects (squishing, bobbing, side-to-side movement)
- */
-function applyIdleAnimation(time, progress) {
-    const originalScale = character.originalScale;
-    
-    // Squish animation (contract and expand)
-    const squishSpeed = 0.002;
-    const squishAmount = 0.08 * progress; // Max 8% squish, scaled by progress
-    squishPhase += squishSpeed;
-    
-    const squish = Math.sin(squishPhase) * squishAmount;
-    const scaleX = originalScale + squish;
-    const scaleY = originalScale - squish;
-    
-    character.setScale(scaleX, scaleY);
-    
-    // Bobbing animation (up and down)
-    const bobSpeed = 0.001;
-    const bobAmount = 5 * progress; // Max 5 pixels, scaled by progress
-    const bob = Math.sin(time * bobSpeed) * bobAmount;
-    
-    // Side-to-side sway
-    const swaySpeed = 0.0008;
-    const swayAmount = 3 * progress; // Max 3 pixels, scaled by progress
-    const sway = Math.sin(time * swaySpeed) * swayAmount;
-    
-    // Store original position if not stored
-    if (!character.getData('idleBaseY')) {
-        character.setData('idleBaseY', character.y);
-        character.setData('idleBaseX', character.x);
+        character.setVelocityY(0);
     }
     
-    // Apply bobbing and swaying (only when not being moved by physics)
-    if (character.body.velocity.y === 0) {
-        character.y = character.getData('idleBaseY') + bob;
+    if (activeEffects.shieldSprite) {
+        activeEffects.shieldSprite.x = character.x;
+        activeEffects.shieldSprite.y = character.y;
     }
     
-    // Apply subtle rotation for extra life
-    const rotationAmount = 0.02 * progress;
-    character.angle = Math.sin(time * 0.001) * rotationAmount * (180 / Math.PI);
-}
-
-// Function to collect medication and increase score
-function collectMedication(character, medication) {
-    medication.disableBody(true, true);
+    if (activeEffects.healingSprite) {
+        activeEffects.healingSprite.x = character.x;
+        activeEffects.healingSprite.y = character.y;
+    }
     
-    score += 10;
-    scoreText.setText('Adherence Score: ' + score);
-
-    // You can add Gemini-generated encouragement messages here!
-    // showEncouragementMessage();
+    const deltaSeconds = delta / 1000;
+    
+    Object.keys(cooldowns).forEach((key, index) => {
+        if (cooldowns[key] > 0) {
+            cooldowns[key] -= deltaSeconds;
+            cooldowns[key] = Math.max(0, cooldowns[key]);
+            
+            if (featureUI[index]) {
+                featureUI[index].cooldownText.setText(cooldowns[key] > 0 ? Math.ceil(cooldowns[key]) + 's' : '');
+            }
+        }
+    });
 }
-
-// Optional: Use Gemini to generate dynamic encouragement messages
-async function showEncouragementMessage() {
-    // This would call your Gemini API to generate personalized messages
-    // Example: "Great job taking your medication! Keep up the healthy habits!"
-}
-
-/* 
- * NEXT STEPS TO COMPLETE YOUR GAME:
- * 
- * 1. Generate your character images:
- *    - Open image-generator.html
- *    - Generate "Robitussin", "Mucinex", etc.
- *    - Save images to your project folder
- * 
- * 2. Create platform images:
- *    - Generate pill/medicine-themed platforms
- *    - Replace the basic platform graphics
- * 
- * 3. Add collectible items:
- *    - Generate small pill/vitamin sprites
- *    - Use as collectibles in the game
- * 
- * 4. Add dynamic content:
- *    - Use Gemini to generate encouragement messages
- *    - Create daily challenges
- *    - Personalize based on medication schedule
- * 
- * 5. Add medication reminder system:
- *    - Track real medication schedules
- *    - Give bonuses for on-time adherence
- *    - Create streak systems
- */
