@@ -40,6 +40,7 @@ let activeEffects = {
 };
 let projectiles;
 let minimap;  // For minimap camera
+let gameReady = false;  // Flag to prevent update from running before create finishes
 
 const WORLD_WIDTH = 3000;
 const WORLD_HEIGHT = 3000;
@@ -63,7 +64,8 @@ function createPlatformGraphics(scene) {
 }
 
 function preload() {
-    this.load.image('character', 'robitussin-sprite.png');
+    // Character sprite will be loaded dynamically from Firebase
+    // Don't load it here - it doesn't exist as a file
     
     // Feature sprites
     this.load.image('fireball', 'assets/features/fireball.png');
@@ -83,28 +85,86 @@ function preload() {
     this.load.image('regular_boulder', 'assets/surroundings/regular_boulder.png');
 }
 
-function create() {
+async function create() {
     // Set world bounds to 3000x3000
     this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     
     const centerX = WORLD_WIDTH / 2;
     const centerY = WORLD_HEIGHT / 2;
 
+    // Load monster data from Firebase
+    console.log('🎮 Loading monster from Firebase...');
+    let monsterData;
+    
+    // Wait for Firebase to be ready
+    const waitForFirebase = () => {
+        return new Promise((resolve) => {
+            const checkFirebase = () => {
+                if (window.FirebaseMonsters) {
+                    resolve();
+                } else {
+                    setTimeout(checkFirebase, 100);
+                }
+            };
+            checkFirebase();
+        });
+    };
+    
+    await waitForFirebase();
+    monsterData = await window.FirebaseMonsters.createRandomMonster();
+    
+    console.log('✅ Monster loaded:', monsterData);
+
+    // Setup character data from Firebase monster
     characterData = {
         hp: 150,
         maxHp: 150,
         attack: 50,
         scale: 1,
-        feature_1: 'fireball',
-        feature_2: 'shield',
-        feature_3: 'yellow_cloud',
-        feature_1_reason: 'High burst damage for offensive power',
-        feature_2_reason: 'Defensive protection during combat',
-        feature_3_reason: 'Healing support for sustainability'
+        med_name: monsterData.med_name,
+        feature_1: monsterData.feature_1 || 'fireball',
+        feature_2: monsterData.feature_2 || 'shield',
+        feature_3: monsterData.feature_3 || 'yellow_cloud',
+        feature_1_reason: monsterData.feature_1_reason || 'Offensive ability',
+        feature_2_reason: monsterData.feature_2_reason || 'Defensive ability',
+        feature_3_reason: monsterData.feature_3_reason || 'Support ability'
     };
 
+    // If monster has a sprite_url, load it dynamically
+    if (monsterData.sprite_url && monsterData.sprite_url.length > 0) {
+        console.log('📸 Loading sprite from Firebase...');
+        console.log('🔍 Sprite URL length:', monsterData.sprite_url.length);
+        console.log('🔍 Sprite URL preview:', monsterData.sprite_url.substring(0, 50) + '...');
+        
+        // Remove existing 'character' texture if it exists (clear cache)
+        if (this.textures.exists('character')) {
+            this.textures.remove('character');
+        }
+        
+        this.textures.addBase64('character', monsterData.sprite_url);
+    } else {
+        console.log('⚠️  No sprite found! Creating placeholder...');
+        // Create a placeholder sprite
+        const graphics = this.add.graphics();
+        graphics.fillStyle(0x00ff00, 1);
+        graphics.fillCircle(64, 64, 60);
+        graphics.fillStyle(0x000000, 1);
+        graphics.fillCircle(40, 50, 10); // eye
+        graphics.fillCircle(88, 50, 10); // eye
+        graphics.fillStyle(0xff0000, 1);
+        graphics.fillRect(40, 80, 48, 5); // mouth
+        
+        // Remove existing 'character' texture if it exists
+        if (this.textures.exists('character')) {
+            this.textures.remove('character');
+        }
+        
+        graphics.generateTexture('character', 128, 128);
+        graphics.destroy();
+    }
+
     character = this.physics.add.sprite(centerX, centerY, 'character');
-    character.setScale(0.08 * characterData.scale);
+    character.setScale(0.5 * characterData.scale);  // Increased from 0.08 to 0.5 for larger character
     character.setCollideWorldBounds(true);
     
     // Add idle animations for character
@@ -140,6 +200,10 @@ function create() {
     this.input.keyboard.on('keydown-ONE', () => activateFeature(this, 1));
     this.input.keyboard.on('keydown-TWO', () => activateFeature(this, 2));
     this.input.keyboard.on('keydown-THREE', () => activateFeature(this, 3));
+    
+    // Mark game as ready after everything is initialized
+    gameReady = true;
+    console.log('✅ Game fully initialized and ready!');
 }
 
 function createCharacterIdleAnimation(scene, character) {
@@ -742,6 +806,11 @@ function updateStatsUI() {
 }
 
 function update(time, delta) {
+    // Don't run update until create is fully finished
+    if (!gameReady || !cursors || !character) {
+        return;
+    }
+    
     const speed = 200;
     
     if (cursors.left.isDown) {

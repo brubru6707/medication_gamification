@@ -1,11 +1,17 @@
+import express from 'express';
+import cors from 'cors';
 import { GoogleGenAI } from "@google/genai";
 import * as fs from "node:fs";
 import sharp from "sharp";
 
+const app = express();
+const PORT = 3000;
 const GEMINI_API_KEY = "AIzaSyBq5m6S2PKJ-DuHCsi72bP5x7PuMYIaDLc";
 
-const AVAILABLE_FEATURES = ['black_smoke', 'fireball', 'poison_droplets', 'shield', 'yellow_cloud', 'none'];
+app.use(cors());
+app.use(express.json());
 
+// Image processing function
 async function processImage(inputPath, outputPath, pixelSize = 8) {
   console.log(`🔧 Processing image: pixelating and removing background...`);
   
@@ -13,23 +19,13 @@ async function processImage(inputPath, outputPath, pixelSize = 8) {
     const image = sharp(inputPath);
     const metadata = await image.metadata();
     
-    console.log(`   📐 Original size: ${metadata.width}x${metadata.height}`);
-    
     const smallWidth = Math.floor(metadata.width / pixelSize);
     const smallHeight = Math.floor(metadata.height / pixelSize);
     
-    console.log(`   🎨 Pixelating to ${smallWidth}x${smallHeight}, then scaling back...`);
-    
     const pixelatedBuffer = await image
-      .resize(smallWidth, smallHeight, {
-        kernel: 'nearest'
-      })
-      .resize(metadata.width, metadata.height, {
-        kernel: 'nearest'
-      })
+      .resize(smallWidth, smallHeight, { kernel: 'nearest' })
+      .resize(metadata.width, metadata.height, { kernel: 'nearest' })
       .toBuffer();
-    
-    console.log(`   🎭 Removing white background...`);
     
     const finalImage = await sharp(pixelatedBuffer)
       .removeAlpha()
@@ -41,7 +37,6 @@ async function processImage(inputPath, outputPath, pixelSize = 8) {
     const pixels = new Uint8Array(data);
     
     const whiteThreshold = 240;
-    let pixelsChanged = 0;
     
     for (let i = 0; i < pixels.length; i += 4) {
       const r = pixels[i];
@@ -50,33 +45,23 @@ async function processImage(inputPath, outputPath, pixelSize = 8) {
       
       if (r > whiteThreshold && g > whiteThreshold && b > whiteThreshold) {
         pixels[i + 3] = 0;
-        pixelsChanged++;
       }
     }
     
-    console.log(`   ✅ Made ${Math.floor(pixelsChanged / 4)} pixels transparent`);
-    
     await sharp(pixels, {
-      raw: {
-        width: info.width,
-        height: info.height,
-        channels: 4
-      }
-    })
-    .png()
-    .toFile(outputPath);
-    
-    console.log(`   💾 Saved processed image: ${outputPath}`);
+      raw: { width: info.width, height: info.height, channels: 4 }
+    }).png().toFile(outputPath);
     
     return outputPath;
   } catch (error) {
-    console.error(`   ❌ Error processing image:`, error.message);
+    console.error(`❌ Error processing image:`, error.message);
     throw error;
   }
 }
 
-export async function generateFeatures(medName, medDesc) {
-  console.log(`🧠 Generating features and reasons for ${medName}...`);
+// Generate features with AI
+async function generateFeatures(medName, medDesc) {
+  console.log(`🧠 Generating features for ${medName}...`);
   
   const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
@@ -118,17 +103,18 @@ Respond ONLY with valid JSON in this exact format (no markdown, no extra text):
     console.error(`❌ Error generating features:`, error.message);
     
     return {
-      feature_1: "none",
-      feature_1_reason: "Default feature",
-      feature_2: "none",
-      feature_2_reason: "Default feature",
-      feature_3: "none",
-      feature_3_reason: "Default feature"
+      feature_1: "fireball",
+      feature_1_reason: "Default offensive ability",
+      feature_2: "shield",
+      feature_2_reason: "Default defensive ability",
+      feature_3: "yellow_cloud",
+      feature_3_reason: "Default healing ability"
     };
   }
 }
 
-export async function generateCharacterSprite(medData, accountId) {
+// Generate sprite with AI
+async function generateCharacterSprite(medData, accountId) {
   console.log(`🎨 Generating sprite for ${medData.med_name}...`);
   
   const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
@@ -171,13 +157,25 @@ Style: Retro 8-bit video game sprite (NES/SNES era)`;
         const finalFileName = `${baseName}-sprite.png`;
         
         fs.writeFileSync(rawFileName, buffer);
-        console.log(`✅ Raw image saved as ${rawFileName}`);
+        console.log(`✅ Raw image saved`);
         
         await processImage(rawFileName, finalFileName, 8);
-        console.log(`🎮 Sprite saved as ${finalFileName}`);
+        console.log(`🎮 Sprite processed`);
         
-        const base64Image = fs.readFileSync(finalFileName, { encoding: 'base64' });
+        // Resize to 256x256 for better quality and compress to reduce file size for Firebase
+        console.log(`📦 Compressing sprite for Firebase...`);
+        const compressedBuffer = await sharp(finalFileName)
+          .resize(256, 256, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 0 } })
+          .png({ quality: 95, compressionLevel: 6 })
+          .toBuffer();
+        
+        // Save compressed version
+        fs.writeFileSync(finalFileName, compressedBuffer);
+        
+        const base64Image = compressedBuffer.toString('base64');
         const dataUrl = `data:image/png;base64,${base64Image}`;
+        
+        console.log(`📏 Final sprite size: ${Math.round(base64Image.length / 1024)}KB`);
         
         fs.unlinkSync(rawFileName);
         
@@ -191,3 +189,66 @@ Style: Retro 8-bit video game sprite (NES/SNES era)`;
     throw error;
   }
 }
+
+// Endpoint to generate a sprite for a specific monster
+app.post('/generate-sprite', async (req, res) => {
+  try {
+    const { account_id, med_id, med_name, med_desc, streak } = req.body;
+
+    console.log(`🎨 Generating sprite for: ${med_name}`);
+
+    // Import Firebase utils
+    const { saveMonster } = await import('./firebase-utils-node.js');
+
+    // Generate features using AI
+    console.log('🧠 Generating features...');
+    const features = await generateFeatures(med_name, med_desc);
+
+    // Generate sprite using AI
+    console.log('🖼️  Generating sprite image...');
+    const spriteResult = await generateCharacterSprite(
+      { med_name, med_desc, med_id },
+      account_id
+    );
+
+    // Create monster document
+    const monsterDoc = {
+      account_id,
+      med_id,
+      med_name,
+      med_desc,
+      streak,
+      feature_1: features.feature_1,
+      feature_2: features.feature_2,
+      feature_3: features.feature_3,
+      feature_1_reason: features.feature_1_reason,
+      feature_2_reason: features.feature_2_reason,
+      feature_3_reason: features.feature_3_reason,
+      sprite_url: spriteResult.base64
+    };
+
+    // Save to Firebase
+    console.log('💾 Saving to Firebase...');
+    const docId = await saveMonster(monsterDoc);
+
+    console.log(`✅ Monster created: ${docId}`);
+
+    // Return the monster data
+    res.json({
+      success: true,
+      monster: monsterDoc
+    });
+
+  } catch (error) {
+    console.error('❌ Error generating sprite:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Sprite Generation Server running on http://localhost:${PORT}`);
+  console.log(`📡 Endpoint: POST http://localhost:${PORT}/generate-sprite`);
+});

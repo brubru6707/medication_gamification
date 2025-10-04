@@ -1,9 +1,6 @@
-// Firebase Browser Configuration
-// This runs in the browser and creates a random monster on page load
-
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getFirestore, collection, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
-import { getAnalytics } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js';
+// Browser-compatible Firebase setup for loading monsters
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js';
+import { getFirestore, collection, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBKeLntfFEDxdZGUfhtdUKvl58WrHt6TdM",
@@ -18,9 +15,8 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const analytics = getAnalytics(app);
 
-// Entries data (embedded for browser use)
+// Embedded entries data (since we can't use fs in browser)
 const entries = [
   {
     "account_id": "user_alpha73",
@@ -98,14 +94,12 @@ const MONSTERS_COLLECTION = 'monsters';
 
 async function getMonster(accountId, medId) {
   const docRef = doc(db, MONSTERS_COLLECTION, `${accountId}_${medId}`);
+  
+  // Force fresh data from server, bypassing cache
   const docSnap = await getDoc(docRef);
   
   if (docSnap.exists()) {
-    const data = docSnap.data();
-    // Only return if sprite_url exists (monster fully created)
-    if (data.sprite_url) {
-      return data;
-    }
+    return docSnap.data();
   }
   return null;
 }
@@ -120,13 +114,13 @@ async function saveMonster(monsterData) {
     med_name: monsterData.med_name,
     med_desc: monsterData.med_desc,
     streak: monsterData.streak,
-    feature_1: monsterData.feature_1,
-    feature_2: monsterData.feature_2,
-    feature_3: monsterData.feature_3,
-    feature_1_reason: monsterData.feature_1_reason,
-    feature_2_reason: monsterData.feature_2_reason,
-    feature_3_reason: monsterData.feature_3_reason,
-    sprite_url: monsterData.sprite_url,
+    feature_1: monsterData.feature_1 || 'none',
+    feature_2: monsterData.feature_2 || 'none',
+    feature_3: monsterData.feature_3 || 'none',
+    feature_1_reason: monsterData.feature_1_reason || 'Placeholder',
+    feature_2_reason: monsterData.feature_2_reason || 'Placeholder',
+    feature_3_reason: monsterData.feature_3_reason || 'Placeholder',
+    sprite_url: monsterData.sprite_url || '',
     created_at: new Date().toISOString()
   });
 
@@ -138,68 +132,147 @@ function getRandomEntry() {
   return entries[randomIndex];
 }
 
-// For browser: we'll create a stub monster without AI generation
-// (AI generation requires backend/Node.js environment)
 async function createRandomMonster() {
   console.log('🔍 Selecting a random entry from embedded data...');
   const entry = getRandomEntry();
   console.log(`🎲 Selected: ${entry.med_name} (account: ${entry.account_id})`);
 
-  // Check if monster already exists
   console.log('🔎 Checking if monster already exists in Firestore...');
-  const existingMonster = await getMonster(entry.account_id, entry.med_id);
-  
-  if (existingMonster) {
-    console.log(`✅ Monster already exists with sprite_url. Using existing monster.`);
-    console.log(`   Monster: ${existingMonster.med_name}`);
-    console.log(`   Features: ${existingMonster.feature_1}, ${existingMonster.feature_2}, ${existingMonster.feature_3}`);
-    return existingMonster;
+  let monster = await getMonster(entry.account_id, entry.med_id);
+
+  if (monster) {
+    console.log(`✅ Found existing monster: ${monster.med_name}`);
+    
+    // Check if sprite is missing
+    if (!monster.sprite_url || monster.sprite_url.length === 0) {
+      console.log('⚠️  Monster found but sprite is missing!');
+      console.log('� Requesting AI sprite generation from backend...');
+      
+      try {
+        const response = await fetch('http://localhost:3000/generate-sprite', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            account_id: entry.account_id,
+            med_id: entry.med_id,
+            med_name: entry.med_name,
+            med_desc: entry.med_desc,
+            streak: entry.streak
+          })
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          console.log('✅ Sprite generated successfully!');
+          console.log('🔄 Reloading page to show new sprite...');
+          
+          // Wait 3 seconds for Firebase to propagate, then force a hard reload (bypass cache)
+          setTimeout(() => {
+            window.location.reload(true);
+          }, 3000);
+          
+          return result.monster;
+        } else {
+          console.error('❌ Failed to generate sprite:', result.error);
+        }
+      } catch (error) {
+        console.error('❌ Error calling sprite generation backend:', error);
+        console.log('⚠️  Make sure the backend server is running:');
+        console.log('   Run: node sprite-generation-server.js');
+      }
+    }
+    
+    return monster;
   }
 
   console.log('🆕 Monster not found in Firestore.');
-  console.log('⚠️  NOTE: Full monster creation (with AI sprite generation) must be done via Node.js script.');
-  console.log('⚠️  Run: node add-random-monster.js');
-  console.log('⚠️  For now, creating a placeholder monster document...');
-  
-  // Create placeholder with default features (will be replaced by Node.js script)
-  const monsterDoc = {
-    account_id: entry.account_id,
-    med_id: entry.med_id,
-    med_name: entry.med_name,
-    med_desc: entry.med_desc,
-    streak: entry.streak,
-    feature_1: "fireball",
-    feature_2: "shield",
-    feature_3: "poison_droplets",
-    feature_1_reason: "Placeholder - run Node.js script for AI generation",
-    feature_2_reason: "Placeholder - run Node.js script for AI generation",
-    feature_3_reason: "Placeholder - run Node.js script for AI generation",
-    sprite_url: "" // Empty sprite_url = not fully created yet
-  };
+  console.log('🎨 Requesting AI sprite generation from backend...');
 
-  console.log('💾 Saving placeholder monster document to Firestore...');
-  const docId = await saveMonster(monsterDoc);
-  console.log(`✅ Placeholder monster saved with document id: ${docId}`);
-  console.log(`⚠️  Run 'node add-random-monster.js' to generate AI sprite and features!`);
-  
-  return monsterDoc;
+  try {
+    const response = await fetch('http://localhost:3000/generate-sprite', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        account_id: entry.account_id,
+        med_id: entry.med_id,
+        med_name: entry.med_name,
+        med_desc: entry.med_desc,
+        streak: entry.streak
+      })
+    });
+
+    const result = await response.json();
+    
+    if (result.success) {
+      console.log('✅ Monster and sprite created successfully!');
+      console.log('🔄 Reloading page to show new sprite...');
+      
+      // Reload the page after 2 seconds to show the new sprite
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+      
+      return result.monster;
+    } else {
+      console.error('❌ Failed to generate sprite:', result.error);
+      
+      // Create placeholder monster if backend fails
+      console.log('⚠️  Creating placeholder monster instead...');
+      const placeholderMonster = {
+        account_id: entry.account_id,
+        med_id: entry.med_id,
+        med_name: entry.med_name,
+        med_desc: entry.med_desc,
+        streak: entry.streak,
+        feature_1: 'fireball',
+        feature_2: 'shield',
+        feature_3: 'yellow_cloud',
+        feature_1_reason: 'Default offensive ability',
+        feature_2_reason: 'Default defensive ability',
+        feature_3_reason: 'Default support ability',
+        sprite_url: ''
+      };
+
+      await saveMonster(placeholderMonster);
+      return placeholderMonster;
+    }
+  } catch (error) {
+    console.error('❌ Error calling sprite generation backend:', error);
+    console.log('⚠️  Make sure the backend server is running:');
+    console.log('   Run: node sprite-generation-server.js');
+    
+    // Create placeholder monster if backend is not available
+    console.log('⚠️  Creating placeholder monster instead...');
+    const placeholderMonster = {
+      account_id: entry.account_id,
+      med_id: entry.med_id,
+      med_name: entry.med_name,
+      med_desc: entry.med_desc,
+      streak: entry.streak,
+      feature_1: 'fireball',
+      feature_2: 'shield',
+      feature_3: 'yellow_cloud',
+      feature_1_reason: 'Default offensive ability',
+      feature_2_reason: 'Default defensive ability',
+      feature_3_reason: 'Default support ability',
+      sprite_url: ''
+    };
+
+    await saveMonster(placeholderMonster);
+    return placeholderMonster;
+  }
 }
 
-// Auto-run on page load
-window.addEventListener('DOMContentLoaded', async () => {
-  try {
-    console.log('🚀 Firebase Monster System Initialized');
-    const monster = await createRandomMonster();
-    window.currentMonster = monster; // Make available globally
-  } catch (error) {
-    console.error('❌ Error initializing monster:', error);
-  }
-});
+// Initialize Firebase and create/load a monster
+console.log('🚀 Firebase Monster System Initialized');
 
-// Export for use in game.js if needed
-window.firebaseMonster = {
-  getMonster,
-  saveMonster,
-  getRandomEntry,
-  createRandomMonster
+// Export for use in game.js
+window.FirebaseMonsters = {
+  createRandomMonster,
+  getMonster
 };

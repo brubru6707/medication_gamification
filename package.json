@@ -8,6 +8,7 @@
     "generate": "node generate-image-node.js",
     "load-character": "node load-character.js",
     "process-features": "node process-features.js",
+    "server": "node sprite-generation-server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -21,6 +22,8 @@
   "license": "ISC",
   "dependencies": {
     "@google/genai": "^0.3.1",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
     "firebase": "^12.3.0",
     "sharp": "^0.34.4"
   }
