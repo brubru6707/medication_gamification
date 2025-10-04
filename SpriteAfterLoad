@@ -1,0 +1,45 @@
+//Function to handle the actual sprite creation and setup
+function createSpriteAfterLoad(scene, playerDataFromServer, spriteKey, spawnX, spawnY) {
+    console.log(`🎨 Creating actual sprite for ${playerDataFromServer.name} with key: ${spriteKey}`);
+
+    const sprite = scene.physics.add.sprite(spawnX, spawnY, spriteKey);
+    sprite.setCollideWorldBounds(true);
+    sprite.setScale(0.15); // Consistent scale
+    sprite.setDepth(10); // Above environment
+
+    const nameText = scene.add.text(spawnX, spawnY - 40, playerDataFromServer.name, {
+        fontFamily: 'Arial',
+        fontSize: '16px',
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 4
+    }).setOrigin(0.5, 0.5).setDepth(11);
+
+    // Store the character data
+    characters[playerDataFromServer.id] = {
+        id: playerDataFromServer.id,
+        name: playerDataFromServer.name,
+        isAlive: playerDataFromServer.hp > 0,
+        features: playerDataFromServer.features,
+        sprite: sprite,
+        nameText: nameText,
+        lastMoveSent: 0,
+    };
+    
+    // Set up camera to follow the local player
+    if (playerDataFromServer.id === socket.playerId) {
+        scene.cameras.main.startFollow(sprite);
+        sprite.setTint(0x3498db); // Visual cue for self
+        console.log(`✅ Camera now following local player: ${playerDataFromServer.name}`);
+    }
+
+    // --- 🛑 IMPORTANT FIX: Add collision for this new sprite ---
+    if (scene.trees && scene.boulders) {
+        scene.physics.add.collider(sprite, scene.trees);
+        scene.physics.add.collider(sprite, scene.boulders);
+    }
+    // --- 🛑 END FIX ---
+    
+    console.log(`✅ Character ${playerDataFromServer.name} fully created and added to scene.`);
+    updatePlayerHUDCard(playerDataFromServer);
+}
