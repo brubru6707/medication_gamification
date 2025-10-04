@@ -76,6 +76,11 @@ function preload() {
     this.load.image('long_tree', 'assets/surroundings/long_tree.png');
     this.load.image('red_tree', 'assets/surroundings/red_tree.png');
     this.load.image('regular_tree', 'assets/surroundings/regular_tree.png');
+    
+    // Boulder sprites
+    this.load.image('crystal_boulder', 'assets/surroundings/crystal_boulder.png');
+    this.load.image('rectangular_boulder', 'assets/surroundings/rectangular_boulder.png');
+    this.load.image('regular_boulder', 'assets/surroundings/regular_boulder.png');
 }
 
 function create() {
@@ -102,6 +107,9 @@ function create() {
     character.setScale(0.08 * characterData.scale);
     character.setCollideWorldBounds(true);
     
+    // Add idle animations for character
+    createCharacterIdleAnimation(this, character);
+    
     // Camera follows character
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.cameras.main.startFollow(character, true, 0.1, 0.1);
@@ -114,6 +122,9 @@ function create() {
     
     // Create random trees throughout the world
     createTrees(this);
+    
+    // Create boulders throughout the world
+    createBoulders(this);
 
     cursors = this.input.keyboard.createCursorKeys();
     keys = this.input.keyboard.addKeys({
@@ -129,6 +140,32 @@ function create() {
     this.input.keyboard.on('keydown-ONE', () => activateFeature(this, 1));
     this.input.keyboard.on('keydown-TWO', () => activateFeature(this, 2));
     this.input.keyboard.on('keydown-THREE', () => activateFeature(this, 3));
+}
+
+function createCharacterIdleAnimation(scene, character) {
+    const baseScale = character.scaleX;
+    
+    // Subtle breathing/pulsing animation
+    scene.tweens.add({
+        targets: character,
+        scaleX: baseScale * 1.02,
+        scaleY: baseScale * 1.02,
+        duration: 1500,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+    });
+    
+    // Random flip every 3 seconds
+    scene.time.addEvent({
+        delay: 3000,
+        callback: () => {
+            if (Math.random() > 0.5) {
+                character.flipX = !character.flipX;
+            }
+        },
+        loop: true
+    });
 }
 
 function createTrees(scene) {
@@ -168,10 +205,36 @@ function createTrees(scene) {
         
         // Create tree sprite with physics
         const tree = scene.physics.add.sprite(x, y, treeType);
-        tree.setScale(scale * 0.1); // Scale down from 1024px original size
+        const visualScale = scale * 0.1;
+        tree.setScale(visualScale); // Scale down from 1024px original size
         tree.setDepth(-1); // Place behind character
-        tree.setImmovable(true); // Trees don't move when hit
+        tree.body.setImmovable(true); // Trees don't move when hit
+        tree.body.moves = false; // Tree body is completely static
         tree.body.allowGravity = false;
+        
+        // Reduce bounding box to 75% while keeping visual scale
+        tree.body.setSize(
+            tree.width * 0.75,
+            tree.height * 0.75
+        );
+        tree.body.setOffset(
+            tree.width * 0.125,  // Center the smaller hitbox
+            tree.height * 0.125
+        );
+        
+        // Add subtle scale animation (breathing effect)
+        const animationDelay = Phaser.Math.Between(0, 2000); // Stagger animations
+        scene.time.delayedCall(animationDelay, () => {
+            scene.tweens.add({
+                targets: tree,
+                scaleX: visualScale * 1.03,
+                scaleY: visualScale * 1.03,
+                duration: Phaser.Math.Between(2000, 5000), // Random 2-5 seconds
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        });
         
         // Add to trees array
         trees.push(tree);
@@ -179,10 +242,105 @@ function createTrees(scene) {
     
     // Store trees in scene for collision detection
     scene.trees = scene.physics.add.group();
-    trees.forEach(tree => scene.trees.add(tree));
+    trees.forEach(tree => {
+        scene.trees.add(tree);
+        tree.body.setImmovable(true);
+        tree.body.moves = false;
+    });
     
     // Add collision between character and trees
     scene.physics.add.collider(character, scene.trees);
+}
+
+function createBoulders(scene) {
+    const boulderTypes = ['crystal_boulder', 'rectangular_boulder', 'regular_boulder'];
+    const numBoulders = 20; // Number of boulders to spawn
+    const boulders = []; // Track all boulder positions
+    const minDistance = 180; // Minimum distance between boulders and other objects
+    
+    // Get existing tree positions to avoid overlap
+    const existingObjects = [];
+    if (scene.trees) {
+        scene.trees.getChildren().forEach(tree => {
+            existingObjects.push({ x: tree.x, y: tree.y });
+        });
+    }
+    
+    let attempts = 0;
+    const maxAttempts = 500; // Prevent infinite loop
+    
+    while (boulders.length < numBoulders && attempts < maxAttempts) {
+        attempts++;
+        
+        // Random position across the full 3000x3000 world
+        const x = Phaser.Math.Between(300, WORLD_WIDTH - 300);
+        const y = Phaser.Math.Between(300, WORLD_HEIGHT - 300);
+        
+        // Check if position is too close to existing objects (trees + boulders)
+        let tooClose = false;
+        
+        // Check against trees
+        for (let obj of existingObjects) {
+            const distance = Phaser.Math.Distance.Between(x, y, obj.x, obj.y);
+            if (distance < minDistance) {
+                tooClose = true;
+                break;
+            }
+        }
+        
+        // Check against other boulders
+        if (!tooClose) {
+            for (let existingBoulder of boulders) {
+                const distance = Phaser.Math.Distance.Between(x, y, existingBoulder.x, existingBoulder.y);
+                if (distance < minDistance) {
+                    tooClose = true;
+                    break;
+                }
+            }
+        }
+        
+        // Skip this position if too close to existing object
+        if (tooClose) continue;
+        
+        // Random boulder type
+        const boulderType = Phaser.Math.RND.pick(boulderTypes);
+        
+        // Random scale between 0.5 and 3.0 (vast range)
+        const scale = Phaser.Math.FloatBetween(0.5, 3.0);
+        
+        // Create boulder sprite with physics
+        const boulder = scene.physics.add.sprite(x, y, boulderType);
+        const visualScale = scale * 0.1;
+        boulder.setScale(visualScale); // Scale down from 1024px original size
+        boulder.setDepth(-1); // Place behind character
+        boulder.body.setImmovable(true); // Boulders don't move when hit
+        boulder.body.moves = false; // Boulder body is completely static
+        boulder.body.allowGravity = false;
+        
+        // Reduce bounding box to 75% while keeping visual scale
+        boulder.body.setSize(
+            boulder.width * 0.75,
+            boulder.height * 0.75
+        );
+        boulder.body.setOffset(
+            boulder.width * 0.125,  // Center the smaller hitbox
+            boulder.height * 0.125
+        );
+        
+        // Add to boulders array
+        boulders.push(boulder);
+    }
+    
+    // Store boulders in scene for collision detection
+    scene.boulders = scene.physics.add.group();
+    boulders.forEach(boulder => {
+        scene.boulders.add(boulder);
+        boulder.body.setImmovable(true);
+        boulder.body.moves = false;
+    });
+    
+    // Add collision between character and boulders
+    scene.physics.add.collider(character, scene.boulders);
 }
 
 function createMinimap(scene) {
@@ -435,6 +593,17 @@ function shootProjectile(scene, type, damage, color) {
     // Add collision with trees - projectile disappears when hitting tree
     if (scene.trees) {
         scene.physics.add.overlap(projectile, scene.trees, (proj, tree) => {
+            proj.destroy();
+            const index = scene.activeProjectiles.indexOf(proj);
+            if (index > -1) {
+                scene.activeProjectiles.splice(index, 1);
+            }
+        });
+    }
+    
+    // Add collision with boulders - projectile disappears when hitting boulder
+    if (scene.boulders) {
+        scene.physics.add.overlap(projectile, scene.boulders, (proj, boulder) => {
             proj.destroy();
             const index = scene.activeProjectiles.indexOf(proj);
             if (index > -1) {

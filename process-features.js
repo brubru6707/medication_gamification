@@ -5,19 +5,18 @@ import * as path from 'node:path';
 // Feature sprites
 const featureDir = './assets/features';
 const featureFiles = [
-    'raw_black_smoke.jpg',
-    'raw_fireball.jpg',
-    'raw_posion_dropplets.jpg',
-    'raw_shield.jpg',
-    'raw_yellow_cloud.png'
+    'raw_yellow_cloud.jpg'
 ];
 
-// Surrounding sprites (trees)
+// Surrounding sprites (trees and boulders)
 const surroundingDir = './assets/surroundings';
 const surroundingFiles = [
     'raw_long_tree.jpg',
     'raw_red_tree.jpg',
-    'raw_regular_tree.jpg'
+    'raw_regular_tree.jpg',
+    'raw_crystal_boulder.jpg',
+    'raw_rectangular_boulder.jpg',
+    'raw_regular_boulder.jpg'
 ];
 
 async function processFeatureSprite(inputPath, outputPath) {
@@ -99,15 +98,15 @@ async function processAllSprites() {
     console.log('✨ All sprites processed!');
     console.log('\n📁 Generated files:');
     console.log('   Features:');
-    console.log('     - black_smoke.png');
-    console.log('     - fireball.png');
-    console.log('     - posion_dropplets.png');
-    console.log('     - shield.png');
     console.log('     - yellow_cloud.png');
-    console.log('   Surroundings:');
+    console.log('   Surroundings (Trees):');
     console.log('     - long_tree.png');
     console.log('     - red_tree.png');
     console.log('     - regular_tree.png');
+    console.log('   Surroundings (Boulders):');
+    console.log('     - crystal_boulder.png');
+    console.log('     - rectangular_boulder.png');
+    console.log('     - regular_boulder.png');
 }
 
 processAllSprites().catch(console.error);
