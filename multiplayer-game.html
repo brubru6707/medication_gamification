@@ -330,8 +330,8 @@
             gamePhase: 'waiting' // waiting, playing, round_end, game_end
         };
 
-        // Load player data from localStorage
-        const storedData = localStorage.getItem('currentMonster');
+        // Load player data from sessionStorage
+        const storedData = sessionStorage.getItem('currentMonster');
         if (storedData) {
             playerData = JSON.parse(storedData);
             console.log('✅ Loaded player data:', playerData.med_name);
@@ -653,10 +653,12 @@
         }
 
         function connectToServer() {
-            socket = new WebSocket('ws://localhost:3001');
+            console.log('🔍 DEBUG: Attempting to connect to WebSocket...');
+            socket = new WebSocket('ws://10.5.0.2:3001');
             
             socket.onopen = () => {
                 console.log('Connected to multiplayer server');
+                console.log('🔍 DEBUG: PlayerData being sent:', playerData);
                 
                 // Register player with server
                 socket.send(JSON.stringify({
@@ -693,10 +695,30 @@
                 case 'registered':
                     // Store our player ID
                     socket.playerId = message.playerId;
+                    console.log("pls bro ", message)
                     console.log(`✅ Registered as player: ${message.playerName} (${message.playerId})`);
+                    
+                    // Join the room specified in the URL
+                    if (roomId) {
+                        console.log(`🚪 Attempting to join room: ${roomId}`);
+                        socket.send(JSON.stringify({
+                            type: 'join_room',
+                            roomId: roomId
+                        }));
+                    }
+                    break;
+                case 'joined_room':
+                    console.log('🚪 Successfully joined room:', message.room.name);
+                    // The server will send game_started if the game is in progress
+                    break;
+                case 'game_starting':
+                    console.log(`🕐 Game starting in ${message.countdown} seconds...`);
+                    alert(`GAME STARTING IN ${message.countdown} SECONDS!`);
                     break;
                 case 'game_started':
                     console.log('🎮 Game started message received!');
+                    console.log('🔍 DEBUG: game_started message content:', message);
+                    alert("GAME STARTED MESSAGE RECEIVED!");
                     initializeGame(message);
                     break;
                 case 'player_action':
@@ -729,11 +751,30 @@
             gameState.maxRounds = data.maxRounds;
             gameState.gamePhase = 'playing';
             gameState.roundStartTime = Date.now();
-            
+            alert("happening now")
             console.log(`🎮 Initializing game for player ID: ${socket.playerId}`);
+            console.log(`🎮 Received ${data.players.length} players from server`);
+            console.log(`🔍 DEBUG: game exists?`, !!game);
+            console.log(`🔍 DEBUG: game.scene exists?`, !!game?.scene);
+            console.log(`🔍 DEBUG: game.scene.scenes[0] exists?`, !!game?.scene?.scenes[0]);
+            
+            if (game && game.scene && game.scene.scenes[0]) {
+                const scene = game.scene.scenes[0];
+                console.log(`🔍 DEBUG: Scene info:`, {
+                    active: scene.scene?.isActive(),
+                    visible: scene.scene?.isVisible(),
+                    key: scene.scene?.key,
+                    cameraBounds: scene.cameras?.main?.getBounds()
+                });
+            }
             
             // Initialize players
+            console.log("da a"+ data)
             data.players.forEach(player => {
+                console.log(`👤 Player data:`, player);
+                console.log(`👤 Has sprite_url?`, !!player.sprite_url);
+                console.log(`👤 sprite_url length:`, player.sprite_url?.length);
+                
                 gameState.players[player.id] = player;
                 createPlayerCharacter(player);
             });
@@ -746,18 +787,117 @@
             }, 3000);
         }
 
-        function createPlayerCharacter(playerData) {
-            if (!game || !game.scene.scenes[0]) return;
+        function createPlayerCharacter(playerDataFromServer) {
+            console.log(`🔍 DEBUG: createPlayerCharacter called for ${playerDataFromServer.name}`);
+            
+            if (!game) {
+                console.error('❌ DEBUG: game is null/undefined');
+                return;
+            }
+            
+            if (!game.scene) {
+                console.error('❌ DEBUG: game.scene is null/undefined');
+                return;
+            }
+            
+            if (!game.scene.scenes[0]) {
+                console.error('❌ DEBUG: game.scene.scenes[0] is null/undefined');
+                return;
+            }
             
             const scene = game.scene.scenes[0];
-            // Spawn in larger world (3000x3000 like single-player)
-            const spawnX = Phaser.Math.Between(400, 2600);
-            const spawnY = Phaser.Math.Between(400, 2600);
             
-            // Create character sprite (use fireball as placeholder)
-            const sprite = scene.physics.add.sprite(spawnX, spawnY, 'fireball');
-            sprite.setScale(0.5); // Larger scale so you can see them
+            // Put ALL characters in the center of the map
+            const spawnX = 1500; // Center X of 3000x3000 world
+            const spawnY = 1500; // Center Y of 3000x3000 world
+            
+            console.log(`🎨 Creating character for ${playerDataFromServer.name} at DEBUG POSITION (${spawnX}, ${spawnY})`);
+            console.log(`🎨 Has sprite_url?`, !!playerDataFromServer.sprite_url);
+            console.log(`🎨 Scene state:`, { 
+                sceneExists: !!scene, 
+                sceneActive: scene.scene?.isActive(), 
+                sceneKey: scene.scene?.key 
+            });
+            
+            // Load the character sprite from Firebase sprite_url
+            const spriteKey = `character_${playerDataFromServer.id}`;
+            
+            if (playerDataFromServer.sprite_url && playerDataFromServer.sprite_url.length > 0) {
+                console.log(`📸 Loading sprite for ${playerDataFromServer.name} from Firebase...`);
+                
+                try {
+                    // Convert base64 to blob URL (same as game.js)
+                    const base64Data = playerDataFromServer.sprite_url.split(',')[1];
+                    const byteCharacters = atob(base64Data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'image/png' });
+                    const blobUrl = URL.createObjectURL(blob);
+                    
+                    // Remove existing texture if it exists
+                    if (scene.textures.exists(spriteKey)) {
+                        scene.textures.remove(spriteKey);
+                    }
+                    
+                    // Load sprite from blob URL
+                    scene.load.image(spriteKey, blobUrl);
+                    scene.load.once('complete', () => {
+                        console.log(`✅ Sprite loaded for ${playerDataFromServer.name}`);
+                        createSpriteAfterLoad(scene, playerDataFromServer, spriteKey, spawnX, spawnY);
+                    });
+                    scene.load.start();
+                    
+                } catch (error) {
+                    console.error(`❌ Failed to load sprite for ${playerDataFromServer.name}:`, error);
+                    // Fallback to fireball
+                    createSpriteAfterLoad(scene, playerDataFromServer, 'fireball', spawnX, spawnY);
+                }
+            } else {
+                console.log(`⚠️ No sprite_url for ${playerDataFromServer.name}, using fireball`);
+                // Try fireball first, but also create a simple colored rectangle as backup
+                if (scene.textures.exists('fireball')) {
+                    createSpriteAfterLoad(scene, playerDataFromServer, 'fireball', spawnX, spawnY);
+                } else {
+                    console.log(`⚠️ Fireball texture not found, creating debug rectangle`);
+                    createDebugSprite(scene, playerDataFromServer, spawnX, spawnY);
+                }
+            }
+        }
+        
+        function createDebugSprite(scene, playerDataFromServer, spawnX, spawnY) {
+            console.log(`🔍 DEBUG: Creating debug rectangle sprite for ${playerDataFromServer.name}`);
+            
+            // Create a colored rectangle as a sprite
+            const graphics = scene.add.graphics();
+            graphics.fillStyle(0x00ff00); // Green color
+            graphics.fillRect(0, 0, 64, 64); // 64x64 rectangle
+            graphics.generateTexture('debug_sprite', 64, 64);
+            graphics.destroy();
+            
+            // Now create the sprite using this texture
+            createSpriteAfterLoad(scene, playerDataFromServer, 'debug_sprite', spawnX, spawnY);
+        }
+        
+        function createSpriteAfterLoad(scene, playerDataFromServer, spriteKey, spawnX, spawnY) {
+            console.log(`🔍 DEBUG: createSpriteAfterLoad called for ${playerDataFromServer.name}`);
+            console.log(`🔍 DEBUG: spriteKey=${spriteKey}, position=(${spawnX}, ${spawnY})`);
+            console.log(`🔍 DEBUG: scene exists?`, !!scene);
+            console.log(`🔍 DEBUG: scene.physics exists?`, !!scene.physics);
+            console.log(`🔍 DEBUG: texture exists?`, scene.textures.exists(spriteKey));
+            
+            // Create character sprite
+            const sprite = scene.physics.add.sprite(spawnX, spawnY, spriteKey);
+            console.log(`🔍 DEBUG: sprite created:`, !!sprite);
+            console.log(`🔍 DEBUG: sprite position:`, sprite.x, sprite.y);
+            
+            sprite.setScale(1.0); // Make larger for debugging
             sprite.setCollideWorldBounds(true);
+            
+            // Add bright color tint for debugging
+            sprite.setTint(0xff0000); // Red tint to make visible
             
             // Add collisions with environment
             if (scene.trees) {
@@ -768,21 +908,21 @@
             }
             
             // Store character data
-            characters[playerData.id] = {
-                id: playerData.id,
-                name: playerData.name,
+            characters[playerDataFromServer.id] = {
+                id: playerDataFromServer.id,
+                name: playerDataFromServer.name,
                 sprite: sprite,
-                hp: playerData.hp,
-                maxHp: playerData.maxHp,
-                attack: playerData.attack,
-                features: playerData.features,
+                hp: playerDataFromServer.hp,
+                maxHp: playerDataFromServer.maxHp,
+                attack: playerDataFromServer.attack,
+                features: playerDataFromServer.features,
                 isAlive: true,
                 wins: 0,
                 lastMoveSent: 0
             };
             
             // Add name label
-            const nameText = scene.add.text(spawnX, spawnY - 40, playerData.name, {
+            const nameText = scene.add.text(spawnX, spawnY - 40, playerDataFromServer.name, {
                 fontSize: '18px',
                 fill: '#ffffff',
                 stroke: '#000000',
@@ -790,15 +930,18 @@
             });
             nameText.setOrigin(0.5);
             
-            characters[playerData.id].nameText = nameText;
+            characters[playerDataFromServer.id].nameText = nameText;
             
             // If this is our player, make camera follow them immediately
-            if (playerData.id === socket.playerId) {
-                console.log('📷 Camera following our player:', playerData.name);
+            if (playerDataFromServer.id === socket.playerId) {
+                console.log('📷 Camera following our player:', playerDataFromServer.name);
                 scene.cameras.main.startFollow(sprite, true, 0.1, 0.1);
+                console.log('📷 Camera position after follow:', scene.cameras.main.scrollX, scene.cameras.main.scrollY);
+                console.log('📷 Camera bounds:', scene.cameras.main.getBounds());
             }
             
-            console.log(`✅ Created character: ${playerData.name} at (${spawnX}, ${spawnY})`);
+            console.log(`✅ Created character: ${playerDataFromServer.name} at (${spawnX}, ${spawnY})`);
+            console.log(`🔍 DEBUG: Total characters created so far:`, Object.keys(characters).length);
         }
 
         function handlePlayerAction(message) {
@@ -1030,9 +1173,9 @@
                         character.sprite.clearTint();
                         character.sprite.setAlpha(1);
                         
-                        // Respawn at random position
-                        character.sprite.x = Phaser.Math.Between(200, 1800);
-                        character.sprite.y = Phaser.Math.Between(200, 1300);
+                        // Respawn ALL characters in the center
+                        character.sprite.x = 1500; // Center X
+                        character.sprite.y = 1500; // Center Y
                     }
                 }
             });

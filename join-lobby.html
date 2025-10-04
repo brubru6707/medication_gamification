@@ -587,7 +587,7 @@
 
         function connectToServer() {
             try {
-                socket = new WebSocket('ws://localhost:3001');
+                socket = new WebSocket('ws://10.5.0.2:3001');
                 
                 socket.onopen = () => {
                     console.log('Connected to multiplayer server');
@@ -665,11 +665,11 @@
                     console.log('📝 Stringified data length:', dataToSave.length);
                     console.log('📝 Stringified data includes "sprite_url"?', dataToSave.includes('sprite_url'));
                     
-                    localStorage.setItem('currentMonster', dataToSave);
+                    sessionStorage.setItem('currentMonster', dataToSave);
                     
                     // Verify what was actually saved
-                    const savedData = localStorage.getItem('currentMonster');
-                    console.log('✅ Retrieved from localStorage:', savedData ? 'exists' : 'MISSING!');
+                    const savedData = sessionStorage.getItem('currentMonster');
+                    console.log('✅ Retrieved from sessionStorage:', savedData ? 'exists' : 'MISSING!');
                     console.log('✅ Retrieved includes "sprite_url"?', savedData?.includes('sprite_url'));
                     
                     console.log('💾 ========== END SAVING ==========');

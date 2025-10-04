@@ -81,12 +81,12 @@ class Room {
         player.roomId = this.id;
         this.lastActivity = Date.now();
         
-        // Auto-start game when 4 players join
-        if (this.players.length === 4 && this.status === 'waiting') {
-            console.log(`🎮 4 players joined! Auto-starting game in room: ${this.name}`);
+        // Auto-start game when 1 player joins (for testing)
+        if (this.players.length === 1 && this.status === 'waiting') {
+            console.log(`🎮 1 player joined! Auto-starting game in room: ${this.name}`);
             setTimeout(() => {
                 this.startGame();
-            }, 1000); // Small delay to ensure all clients are ready
+            }, 3000); // Give time for client to fully connect
         }
         
         return true;
@@ -111,7 +111,7 @@ class Room {
     }
 
     canStart() {
-        return this.players.length >= 2 && this.players.length <= 4 && this.status === 'waiting';
+        return this.players.length >= 1 && this.players.length <= 4 && this.status === 'waiting';
     }
 
     startGame() {
@@ -309,7 +309,14 @@ class Room {
     }
 
     broadcast(message) {
-        this.players.forEach(player => player.send(message));
+        console.log(`📡 Broadcasting ${message.type} to ${this.players.length} players in room ${this.name}`);
+        this.players.forEach(player => {
+            try {
+                player.send(message);
+            } catch (error) {
+                console.error(`❌ Failed to send ${message.type} to ${player.name}:`, error);
+            }
+        });
     }
 
     getPublicData() {
@@ -391,15 +398,14 @@ wss.on('connection', (ws) => {
                         playerName: player.name
                     });
                     
-                    // If player is in a room that's already playing, send them the game state
-                    if (player.roomId) {
-                        const playerRoom = rooms.get(player.roomId);
-                        if (playerRoom && playerRoom.status === 'playing') {
-                            console.log(`🎮 Player ${player.name} reconnecting to active game`);
+                    // Check if any room is already playing and this player should be in it
+                    for (const [roomId, room] of rooms.entries()) {
+                        if (room.status === 'playing') {
+                            console.log(`🎮 Active game found! Sending state to ${player.name}`);
                             player.send({
                                 type: 'game_started',
-                                roomId: playerRoom.id,
-                                players: playerRoom.players.map(p => ({
+                                roomId: room.id,
+                                players: room.players.map(p => ({
                                     id: p.id,
                                     name: p.name,
                                     hp: p.hp,
@@ -408,9 +414,10 @@ wss.on('connection', (ws) => {
                                     features: [p.data.feature_1, p.data.feature_2, p.data.feature_3],
                                     sprite_url: p.data.sprite_url
                                 })),
-                                round: playerRoom.currentRound,
-                                maxRounds: playerRoom.maxRounds
+                                round: room.currentRound,
+                                maxRounds: room.maxRounds
                             });
+                            break;
                         }
                     }
                     
@@ -459,6 +466,26 @@ wss.on('connection', (ws) => {
                             },
                             room: targetRoom.getPublicData()
                         });
+
+                        // If game is already in progress, send the game state to the new player
+                        if (targetRoom.status === 'playing') {
+                            console.log(`🎮 Game in progress. Sending state to ${player.name}`);
+                            player.send({
+                                type: 'game_started',
+                                roomId: targetRoom.id,
+                                players: targetRoom.players.map(p => ({
+                                    id: p.id,
+                                    name: p.name,
+                                    hp: p.hp,
+                                    maxHp: p.maxHp,
+                                    attack: p.attack,
+                                    features: [p.data.feature_1, p.data.feature_2, p.data.feature_3],
+                                    sprite_url: p.data.sprite_url
+                                })),
+                                round: targetRoom.currentRound,
+                                maxRounds: targetRoom.maxRounds
+                            });
+                        }
                         
                         broadcastRoomsUpdate();
                     } else {
@@ -543,9 +570,9 @@ wss.on('connection', (ws) => {
         }
     });
 
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
         if (player) {
-            console.log(`👤 Player disconnected: ${player.name}`);
+            console.log(`👤 Player disconnected: ${player.name} (Code: ${code}, Reason: ${reason})`);
             
             // Remove from room if in one
             if (player.roomId) {
@@ -568,17 +595,17 @@ wss.on('connection', (ws) => {
     });
 
     ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
+        console.error(`WebSocket error for ${player?.name || 'unknown'}:`, error);
     });
 });
 
 // Cleanup inactive rooms every 5 minutes
 setInterval(cleanupInactiveRooms, 5 * 60 * 1000);
 
-server.listen(PORT, () => {
-    console.log(`🚀 Multiplayer Server running on ws://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Multiplayer Server running on ws://10.5.0.2:${PORT}`);
     console.log(`🎮 Ready for medication monster battles!`);
-    console.log(`🏥 Lobby: http://localhost:3000/join-lobby.html`);
+    console.log(`🏥 Lobby: http://10.5.0.2:3000/join-lobby.html`);
 });
 
 // Graceful shutdown

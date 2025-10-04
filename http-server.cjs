@@ -57,10 +57,10 @@ const server = http.createServer((req, res) => {
     });
 });
 
-server.listen(PORT, () => {
-    console.log(`🌐 HTTP Server running on http://localhost:${PORT}`);
-    console.log(`🏥 Lobby: http://localhost:${PORT}/join-lobby.html`);
-    console.log(`🎮 Game: http://localhost:${PORT}/index.html`);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🌐 HTTP Server running on http://10.5.0.2:${PORT}`);
+    console.log(`🏥 Lobby: http://10.5.0.2:${PORT}/join-lobby.html`);
+    console.log(`🎮 Game: http://10.5.0.2:${PORT}/index.html`);
 });
 
 // Handle server shutdown
