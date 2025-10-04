@@ -53,16 +53,6 @@ const FEATURE_COLORS = {
     'yellow_cloud': 0xffff00
 };
 
-function createPlatformGraphics(scene) {
-    if (!scene.textures.exists('platform')) {
-        const graphics = scene.add.graphics();
-        graphics.fillStyle(0x00DD00, 1);
-        graphics.fillRect(0, 0, 400, 32);
-        graphics.generateTexture('platform', 400, 32);
-        graphics.destroy();
-    }
-}
-
 function preload() {
     // Character sprite will be loaded dynamically from Firebase
     // Don't load it here - it doesn't exist as a file
@@ -134,72 +124,124 @@ async function create() {
     if (monsterData.sprite_url && monsterData.sprite_url.length > 0) {
         console.log('📸 Loading sprite from Firebase...');
         console.log('🔍 Sprite URL length:', monsterData.sprite_url.length);
-        console.log('🔍 Sprite URL preview:', monsterData.sprite_url.substring(0, 50) + '...');
+        console.log('🔍 First 100 chars:', monsterData.sprite_url.substring(0, 100));
         
         // Remove existing 'character' texture if it exists (clear cache)
         if (this.textures.exists('character')) {
             this.textures.remove('character');
         }
         
-        this.textures.addBase64('character', monsterData.sprite_url);
+        // Convert base64 to blob URL for better compatibility
+        try {
+            // Extract just the base64 data (remove data:image/png;base64, prefix)
+            const base64Data = monsterData.sprite_url.split(',')[1];
+            const byteCharacters = atob(base64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'image/png' });
+            const blobUrl = URL.createObjectURL(blob);
+            
+            // Load using blob URL instead of base64
+            this.load.image('character', blobUrl);
+            this.load.start(); // Start loading immediately
+            
+            console.log('✅ Character texture loading via blob URL...');
+        } catch (error) {
+            console.error('❌ Failed to create blob URL:', error);
+            // Fallback to base64
+            this.textures.addBase64('character', monsterData.sprite_url);
+        }
+        
     } else {
         console.log('⚠️  No sprite found! Creating placeholder...');
         // Create a placeholder sprite
-        const graphics = this.add.graphics();
-        graphics.fillStyle(0x00ff00, 1);
-        graphics.fillCircle(64, 64, 60);
-        graphics.fillStyle(0x000000, 1);
-        graphics.fillCircle(40, 50, 10); // eye
-        graphics.fillCircle(88, 50, 10); // eye
-        graphics.fillStyle(0xff0000, 1);
-        graphics.fillRect(40, 80, 48, 5); // mouth
+        // const graphics = this.add.graphics();
+        // graphics.fillStyle(0x00ff00, );
+        // graphics.fillCircle(64, 64, 160);
+        // graphics.fillStyle(0x000000, 1);
+        // graphics.fillCircle(40, 50, 10); // eye
+        // graphics.fillCircle(88, 50, 10); // eye
+        // graphics.fillStyle(0xff0000, 1);
+        // graphics.fillRect(40, 80, 48, 5); // mouth
         
-        // Remove existing 'character' texture if it exists
-        if (this.textures.exists('character')) {
-            this.textures.remove('character');
-        }
+        // // Remove existing 'character' texture if it exists
+        // if (this.textures.exists('character')) {
+        //     this.textures.remove('character');
+        // }
         
-        graphics.generateTexture('character', 128, 128);
-        graphics.destroy();
+        // graphics.generateTexture('character', 128, 128);
+        // graphics.destroy();
     }
 
-    character = this.physics.add.sprite(centerX, centerY, 'character');
-    character.setScale(0.5 * characterData.scale);  // Increased from 0.08 to 0.5 for larger character
-    character.setCollideWorldBounds(true);
-    
-    // Add idle animations for character
-    createCharacterIdleAnimation(this, character);
-    
+    // Wait for texture to load if using blob URL approach
+    if (monsterData.sprite_url && monsterData.sprite_url.length > 0) {
+        // Wait for the texture to finish loading
+        this.load.once('complete', () => {
+            console.log('✅ Texture loading complete!');
+            console.log('🔍 Character texture exists:', this.textures.exists('character'));
+            
+            // Create character with the loaded texture
+            character = this.physics.add.sprite(centerX, centerY, 'character');
+            character.setScale(0.5 * characterData.scale);
+            character.setCollideWorldBounds(true);
+            
+            // Add idle animations for character
+            createCharacterIdleAnimation(this, character);
+            
+            // Setup camera and complete initialization
+            setupGameAfterCharacter(this);
+            
+            console.log('✅ Character created with AI sprite!');
+        });
+    } else {
+        // Fallback to fireball texture for testing
+        console.log('⚠️  Using fireball texture as fallback');
+        character = this.physics.add.sprite(centerX, centerY, 'fireball');
+        character.setScale(0.5 * characterData.scale);
+        character.setCollideWorldBounds(true);
+        
+        // Add idle animations for character
+        createCharacterIdleAnimation(this, character);
+        
+        // Setup camera and complete initialization
+        setupGameAfterCharacter(this);
+    }
+}
+
+function setupGameAfterCharacter(scene) {
     // Camera follows character
-    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-    this.cameras.main.startFollow(character, true, 0.1, 0.1);
-    this.cameras.main.setZoom(1);
+    scene.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    scene.cameras.main.startFollow(character, true, 0.1, 0.1);
+    scene.cameras.main.setZoom(1);
     
     // Create minimap in top-right corner
-    createMinimap(this);
+    createMinimap(scene);
 
-    projectiles = this.physics.add.group();
+    projectiles = scene.physics.add.group();
     
     // Create random trees throughout the world
-    createTrees(this);
+    createTrees(scene);
     
     // Create boulders throughout the world
-    createBoulders(this);
+    createBoulders(scene);
 
-    cursors = this.input.keyboard.createCursorKeys();
-    keys = this.input.keyboard.addKeys({
+    cursors = scene.input.keyboard.createCursorKeys();
+    keys = scene.input.keyboard.addKeys({
         one: Phaser.Input.Keyboard.KeyCodes.ONE,
         two: Phaser.Input.Keyboard.KeyCodes.TWO,
         three: Phaser.Input.Keyboard.KeyCodes.THREE
     });
 
-    createControlsUI(this);
-    createFeatureUI(this);
-    createStatsUI(this);
+    createControlsUI(scene);
+    createFeatureUI(scene);
+    createStatsUI(scene);
 
-    this.input.keyboard.on('keydown-ONE', () => activateFeature(this, 1));
-    this.input.keyboard.on('keydown-TWO', () => activateFeature(this, 2));
-    this.input.keyboard.on('keydown-THREE', () => activateFeature(this, 3));
+    scene.input.keyboard.on('keydown-ONE', () => activateFeature(scene, 1));
+    scene.input.keyboard.on('keydown-TWO', () => activateFeature(scene, 2));
+    scene.input.keyboard.on('keydown-THREE', () => activateFeature(scene, 3));
     
     // Mark game as ready after everything is initialized
     gameReady = true;

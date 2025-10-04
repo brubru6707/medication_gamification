@@ -135,6 +135,7 @@ function getRandomEntry() {
 async function createRandomMonster() {
   console.log('🔍 Selecting a random entry from embedded data...');
   const entry = getRandomEntry();
+  console.log(entry)
   console.log(`🎲 Selected: ${entry.med_name} (account: ${entry.account_id})`);
 
   console.log('🔎 Checking if monster already exists in Firestore...');
@@ -143,9 +144,8 @@ async function createRandomMonster() {
   if (monster) {
     console.log(`✅ Found existing monster: ${monster.med_name}`);
     
-    // Check if sprite is missing
-    if (!monster.sprite_url || monster.sprite_url.length === 0) {
-      console.log('⚠️  Monster found but sprite is missing!');
+    if (monster.sprite_url == '') {
+      console.log('⚠️  Monster found but sprite is missing or is a placeholder!');
       console.log('� Requesting AI sprite generation from backend...');
       
       try {
@@ -167,13 +167,9 @@ async function createRandomMonster() {
         
         if (result.success) {
           console.log('✅ Sprite generated successfully!');
-          console.log('🔄 Reloading page to show new sprite...');
+          console.log('🎮 Using newly generated sprite...');
           
-          // Wait 3 seconds for Firebase to propagate, then force a hard reload (bypass cache)
-          setTimeout(() => {
-            window.location.reload(true);
-          }, 3000);
-          
+          // Return the newly generated monster directly (no reload needed!)
           return result.monster;
         } else {
           console.error('❌ Failed to generate sprite:', result.error);
@@ -210,13 +206,9 @@ async function createRandomMonster() {
     
     if (result.success) {
       console.log('✅ Monster and sprite created successfully!');
-      console.log('🔄 Reloading page to show new sprite...');
+      console.log('🎮 Loading new sprite into game...');
       
-      // Reload the page after 2 seconds to show the new sprite
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-      
+      // Return the monster directly - no need to reload!
       return result.monster;
     } else {
       console.error('❌ Failed to generate sprite:', result.error);
