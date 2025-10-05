@@ -19,8 +19,34 @@ export default function GamePage() {
       return;
     }
 
+    console.log('═══════════════════════════════════════════════');
+    console.log('🎮 GAME PAGE - MEDICATION DATA CHECK');
+    console.log('═══════════════════════════════════════════════');
+    
     // Get medication data from URL if present
     const medDataParam = searchParams.get('medData');
+    
+    console.log('📦 Raw medData parameter:', medDataParam);
+    console.log('📊 Parameter exists?', !!medDataParam);
+    console.log('📊 Parameter length:', medDataParam?.length || 0);
+    
+    if (medDataParam) {
+      try {
+        const decodedData = JSON.parse(decodeURIComponent(medDataParam));
+        console.log('✅ Successfully decoded medication data:');
+        console.log('   - Account ID:', decodedData.account_id);
+        console.log('   - Med ID:', decodedData.med_id);
+        console.log('   - Med Name:', decodedData.med_name);
+        console.log('   - Med Desc:', decodedData.med_desc);
+        console.log('   - Streak:', decodedData.streak);
+        console.log('📦 Complete decoded object:', decodedData);
+      } catch (error) {
+        console.error('❌ Error decoding medData:', error);
+      }
+    } else {
+      console.log('⚠️  NO MEDICATION DATA IN URL!');
+      console.log('💡 Make sure you clicked the Battle button on a medication');
+    }
     
     // Build the game URL with medication data
     let gameUrl = "/medication_gamification/index.html";
@@ -28,7 +54,12 @@ export default function GamePage() {
     if (medDataParam) {
       // Pass medication data to game via URL parameters
       gameUrl += `?medData=${encodeURIComponent(medDataParam)}`;
+      console.log('🔗 Final game URL:', gameUrl);
+    } else {
+      console.log('⚠️  Redirecting to game WITHOUT medication data');
     }
+    
+    console.log('═══════════════════════════════════════════════');
     
     // Redirect to the actual game page with medication data
     window.location.href = gameUrl;

@@ -19,6 +19,10 @@ export default function MedicationCard({ med, onLog, hideLog=false }:{ med: Medi
   const pct = Math.min(100, 100 * (med.progress?.taken || 0) / (med.progress?.total || 1));
   
   const handleBattle = () => {
+    console.log('═══════════════════════════════════════════════');
+    console.log('⚔️  BATTLE BUTTON CLICKED!');
+    console.log('═══════════════════════════════════════════════');
+    
     // Encode medication data and pass to game
     const medData = {
       account_id: user?.uid || 'unknown',
@@ -28,12 +32,24 @@ export default function MedicationCard({ med, onLog, hideLog=false }:{ med: Medi
       streak: med.progress?.taken || 0
     };
     
+    console.log('📦 Medication data being sent:');
+    console.log('   - Account ID:', medData.account_id);
+    console.log('   - Med ID:', medData.med_id);
+    console.log('   - Med Name:', medData.med_name);
+    console.log('   - Med Desc:', medData.med_desc);
+    console.log('   - Streak:', medData.streak);
+    console.log('📦 Full medData object:', medData);
+    
     // Navigate to game with medication data in URL
     const params = new URLSearchParams({
       medData: JSON.stringify(medData)
     });
     
-    router.push(`/game?${params.toString()}`);
+    const gameUrl = `/game?${params.toString()}`;
+    console.log('🔗 Navigating to:', gameUrl);
+    console.log('═══════════════════════════════════════════════');
+    
+    router.push(gameUrl);
   };
   
   const isChild = user?.role === "child";
