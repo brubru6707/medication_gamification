@@ -1,9 +1,10 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
   "/(protected)/parent/children/page": "app/(protected)/parent/children/page.js",
-  "/(protected)/chat/page": "app/(protected)/chat/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(protected)/dashboard/page": "app/(protected)/dashboard/page.js",
   "/(protected)/profile/page": "app/(protected)/profile/page.js",
+  "/page": "app/page.js",
+  "/(protected)/meds/page": "app/(protected)/meds/page.js",
   "/(protected)/game/page": "app/(protected)/game/page.js"
 }

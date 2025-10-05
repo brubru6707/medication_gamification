@@ -1,28 +1,109 @@
-"node_modules" 
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
 # Dependencies
-node_modules
+node_modules/
+/.pnp
+.pnp.js
 
-# Next.js build output
-.next
+# Testing
+/coverage
 
-# Firebase Service Account Keys (NEVER COMMIT!)
-serviceAccountKey.json
-backend/serviceAccountKey.json
-**/serviceAccountKey*.json
+# Next.js
+/.next/
+/out/
 
-# Environment variables
+# Production
+/build
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local env files
 .env
-.env.local
 .env*.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Python
-__pycache__/
-*.py[cod]
-*.so
-*.egg-info/
-dist/
-build/
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+pubsub-debug.log
+
+# Firebase Functions
+functions/node_modules/
+functions/.env
+functions/lib/
+
+# Game assets - generated sprites
+public/medication_gamification/generated/
+public/medication_gamification/temp/
+public/medication_gamification/sprites/generated_*.png
+*.png.tmp
 
 # Logs
+logs/
 *.log
-npm-debug.log*
+
+# Python (if using)
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+ENV/
+.venv/
+
+# Package files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Sensitive files - DO NOT COMMIT
+**/config/keys.js
+**/config/secrets.json
+**/api-keys.json
+.env.keys
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Test files (optional - remove if you want to commit tests)
+# **/*.test.js
+# **/*.spec.js
