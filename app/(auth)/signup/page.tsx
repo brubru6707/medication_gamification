@@ -13,14 +13,21 @@ export default function SignupPage(){
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [parentCode, setParentCode] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
+    
     try {
       await register(name, dob, email, password, role, role === "child" ? parentCode : undefined);
       r.push("/dashboard");
     } catch (err:any) {
-      alert(err?.message || "Could not sign up. If you're creating a child account, make sure the Parent Code is correct.");
+      setError(err?.message || "Could not sign up. If you're creating a child account, make sure the Parent Code is correct.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -47,7 +54,20 @@ export default function SignupPage(){
             <div><label>Date of Birth</label><input type="date" value={dob} onChange={e=>setDob(e.target.value)} required /></div>
             <div><label>Email</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)} required /></div>
             <div><label>Password</label><input type="password" value={password} onChange={e=>setPassword(e.target.value)} required /></div>
-            <button className="btn btn-primary w-full mt-2">Create Account</button>
+            
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+                {error}
+              </div>
+            )}
+            
+            <button 
+              type="submit" 
+              className="btn btn-primary w-full mt-2" 
+              disabled={loading}
+            >
+              {loading ? "Creating account..." : "Create Account"}
+            </button>
           </form>
           <div className="text-center mt-4 text-sm">Already have an account? <Link href="/login" className="text-ink underline">Sign in</Link></div>
         </div>

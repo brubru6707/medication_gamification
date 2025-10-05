@@ -27,7 +27,7 @@ export default function MedicationCard({ med, onLog, hideLog=false }:{ med: Medi
       <div className="flex flex-col gap-2 items-end">
         <div className="rounded-full bg-slate-100 px-3 py-1 text-sm flex items-center gap-2">
           <Clock size={16} />
-          <span>{med.times.join(", ")}</span>
+          <span>{(med.times && med.times.length > 0) ? med.times.join(", ") : "No time set"}</span>
         </div>
         <div className="text-slate-500 text-sm">{med.progress?.taken || 0}/{med.progress?.total || 0}</div>
         {!hideLog && <button className="btn btn-primary flex items-center gap-2" onClick={onLog}><CheckCircle size={16}/> Log dose</button>}

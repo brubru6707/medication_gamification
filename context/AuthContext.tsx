@@ -79,24 +79,38 @@ export function AuthProvider({ children }:{children: React.ReactNode}){
         if (stored) { 
           setUser(stored); 
         } else {
-          const u: User = { 
-            uid: fbUser.uid, 
-            email: fbUser.email, 
-            displayName: fbUser.displayName || undefined, 
-            dob: null, 
-            role: "parent", 
-            parentCode: generateParentCode(),
-            children: [] 
-          };
-          await saveProfile(db, u); 
-          setUser(u);
+          // Don't auto-create profile here - let register() or login() handle it
+          // Just wait for profile to be created
+          setUser(null);
         }
       } else {
         setUser(null);
+        // Redirect to login when user signs out or session changes
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+          window.location.href = '/login';
+        }
       }
       setLoading(false);
     });
-    return () => unsub();
+    
+    // Listen for auth state changes across tabs
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'firebase:authUser' || e.key === null) {
+        // Auth state changed in another tab
+        window.location.reload();
+      }
+    };
+    
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', handleStorageChange);
+    }
+    
+    return () => {
+      unsub();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('storage', handleStorageChange);
+      }
+    };
   }, []);
 
   const login = async (email:string, password:string) => {
@@ -119,39 +133,52 @@ export function AuthProvider({ children }:{children: React.ReactNode}){
   };
 
   const register = async (name:string, dob:string, email:string, password:string, role: Role, parentCode?: string) => {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(cred.user, { displayName: name });
-    const uid = cred.user.uid;
-    let profile: User;
-    
-    if (role === "parent") {
-      profile = { 
-        uid, 
-        email, 
-        displayName: name, 
-        dob, 
-        role: "parent", 
-        parentCode: generateParentCode(),
-        children: [] 
-      };
-    } else {
+    // For child accounts, validate parent code FIRST before creating Firebase account
+    if (role === "child") {
       if (!parentCode) throw new Error("Parent code required for child accounts");
       const parent = await findParentByCode(db, parentCode);
-      if (!parent) throw new Error("Invalid parent code");
-      
-      profile = { 
-        uid, 
-        email, 
-        displayName: name, 
-        dob, 
-        role: "child", 
-        parentId: parent.uid 
-      };
-      await addChildToParent(db, parent.uid, uid);
+      if (!parent) throw new Error("Invalid parent code. Please check with your parent and try again.");
     }
     
-    await saveProfile(db, profile);
-    setUser(profile);
+    // Now create the Firebase account
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    
+    try {
+      await updateProfile(cred.user, { displayName: name });
+      const uid = cred.user.uid;
+      let profile: User;
+      
+      if (role === "parent") {
+        profile = { 
+          uid, 
+          email, 
+          displayName: name, 
+          dob, 
+          role: "parent", 
+          parentCode: generateParentCode(),
+          children: [] 
+        };
+      } else {
+        // Parent code already validated above
+        const parent = await findParentByCode(db, parentCode!);
+        profile = { 
+          uid, 
+          email, 
+          displayName: name, 
+          dob, 
+          role: "child", 
+          parentId: parent!.uid 
+        };
+        await addChildToParent(db, parent!.uid, uid);
+      }
+      
+      await saveProfile(db, profile);
+      setUser(profile);
+    } catch (error) {
+      // If anything fails after Firebase account creation, delete the account
+      await cred.user.delete();
+      throw error;
+    }
   };
 
   const logout = async () => {

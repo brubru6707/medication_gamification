@@ -4,37 +4,39 @@ import { useAuth } from "@/context/AuthContext";
 import { loadMeds, saveMeds } from "@/lib/storage";
 import { extractMedicationInfo } from "@/lib/gemini-ocr";
 import { Upload, Save, X, Camera } from "lucide-react";
+import NavTabs from "@/components/NavTabs";
+import { useRouter } from "next/navigation";
+import type { Medication } from "@/components/MedicationCard";
+import MedicationCard from "@/components/MedicationCard";
 
 function AddMedPage() {
-  const { user, getProfile } = useAuth();
-  const [children, setChildren] = useState<any[]>([]);
-  const [selectedChild, setSelectedChild] = useState("");
+  const { user } = useAuth();
+  const router = useRouter();
   const [images, setImages] = useState<File[]>([]);
   const [name, setName] = useState("");
   const [dosage, setDosage] = useState("");
   const [description, setDescription] = useState("");
   const [rxNumber, setRxNumber] = useState("");
+  const [times, setTimes] = useState<string[]>(["08:00"]);
+  const [frequency, setFrequency] = useState<"Once daily" | "Twice daily" | "Custom">("Once daily");
   const [loading, setLoading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [savedMedications, setSavedMedications] = useState<Medication[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  useEffect(()=>{
-    async function loadChildren() {
-      if (!user?.children) return;
-      const profiles = [];
-      for (const uid of user.children) {
-        const profile = await getProfile(uid);
-        if (profile) profiles.push(profile);
-      }
-      setChildren(profiles);
-      if (profiles.length > 0 && !selectedChild) {
-        setSelectedChild(profiles[0].uid);
-      }
+  // Load saved medications on mount
+  useEffect(() => {
+    if (user?.uid) {
+      const meds = loadMeds(user.uid);
+      setSavedMedications(meds);
     }
-    loadChildren();
-  }, [user?.children]);
+  }, [user?.uid]);
+
+  const addTime = () => setTimes(t => [...t, "20:00"]);
+  const updateTime = (i:number, val:string) => setTimes(ts => ts.map((t, idx)=> idx===i? val : t));
+  const removeTime = (i:number) => setTimes(ts => ts.filter((_, idx)=> idx!==i));
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -126,62 +128,51 @@ function AddMedPage() {
   };
 
   const saveMedication = async () => {
-    if (!selectedChild || !name) {
-      alert('Please select a child and enter medication name');
+    if (!user?.uid || !name) {
+      alert('Please enter medication name');
       return;
     }
 
-    const existingMeds = loadMeds(selectedChild);
-    const newMed = {
+    const existingMeds = loadMeds(user.uid);
+    const newMed: Medication = {
       id: Date.now().toString(),
       name,
       dosage,
-      description,
-      rxNumber,
-      nextDose: new Date().toISOString(),
-      frequency: 'daily'
+      frequency,
+      times: times.length > 0 ? times : ["08:00"],
+      progress: { taken: 0, total: times.length * 7 }
     };
 
-    saveMeds(selectedChild, [...existingMeds, newMed]);
+    const updatedMeds = [...existingMeds, newMed];
+    saveMeds(user.uid, updatedMeds);
     
+    // Update the saved medications list
+    setSavedMedications(updatedMeds);
+    
+    // Clear form
     setName('');
     setDosage('');
     setDescription('');
     setRxNumber('');
     setImages([]);
-    setSelectedChild('');
+    setTimes(["08:00"]);
+    setFrequency("Once daily");
+    stopCamera();
     
     alert('Medication added successfully!');
+    
+    // Navigate to meds page to see the new medication
+    router.push('/meds');
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Add Medication</h1>
-      
-      {false ? (
-        <div className="card card-pad text-center text-gray-500">
-          No children linked to your account
-        </div>
-      ) : (
-        <>
-          <div className="card card-pad">
-            <label className="block text-sm font-medium mb-2">Select Child</label>
-            <select 
-              value={selectedChild} 
-              onChange={(e) => setSelectedChild(e.target.value)}
-              className="w-full p-2 border rounded-md"
-            >
-              <option value="">Choose a child...</option>
-              {children.map(child => (
-                <option key={child.uid} value={child.uid}>
-                  {child.displayName}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="card card-pad">
-            <label className="block text-sm font-medium mb-2">Add Images (up to 4)</label>
+    <div>
+      <NavTabs />
+      <div className="p-4 max-w-4xl mx-auto space-y-6">
+        <h1 className="text-2xl font-bold">Add Medication for Myself</h1>
+        
+        <div className="card card-pad">
+          <label className="block text-sm font-medium mb-2">Add Images (up to 4)</label>
             
             <div className="flex gap-2 mb-4">
               <input
@@ -280,12 +271,57 @@ function AddMedPage() {
                 value={dosage}
                 onChange={(e) => setDosage(e.target.value)}
                 className="w-full p-2 border rounded-md"
-                placeholder="Enter dosage and frequency"
+                placeholder="e.g., 10mg"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Description</label>
+              <label className="block text-sm font-medium mb-2">Frequency</label>
+              <select 
+                value={frequency} 
+                onChange={(e) => setFrequency(e.target.value as "Once daily" | "Twice daily" | "Custom")}
+                className="w-full p-2 border rounded-md"
+              >
+                <option>Once daily</option>
+                <option>Twice daily</option>
+                <option>Custom</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Time(s)</label>
+              <div className="space-y-2">
+                {times.map((t, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input 
+                      type="time" 
+                      value={t} 
+                      onChange={(e) => updateTime(i, e.target.value)}
+                      className="flex-1 p-2 border rounded-md"
+                    />
+                    {times.length > 1 && (
+                      <button 
+                        type="button"
+                        onClick={() => removeTime(i)} 
+                        className="btn btn-ghost"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button 
+                  type="button"
+                  onClick={addTime} 
+                  className="btn btn-ghost"
+                >
+                  + Add time
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Description (Optional)</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -296,7 +332,7 @@ function AddMedPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">RX Number</label>
+              <label className="block text-sm font-medium mb-2">RX Number (Optional)</label>
               <input
                 type="text"
                 value={rxNumber}
@@ -308,15 +344,30 @@ function AddMedPage() {
 
             <button
               onClick={saveMedication}
-              disabled={!selectedChild || !name}
+              disabled={!name}
               className="flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 disabled:opacity-50"
             >
               <Save size={18} />
               Save Medication
             </button>
           </div>
-        </>
-      )}
+
+          {/* Saved Medications Section */}
+          {savedMedications.length > 0 && (
+            <div className="card card-pad">
+              <h2 className="text-xl font-bold mb-4">My Saved Medications ({savedMedications.length})</h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                {savedMedications.map((med) => (
+                  <MedicationCard 
+                    key={med.id} 
+                    med={med} 
+                    onMark={() => {}} 
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+      </div>
     </div>
   );
 }

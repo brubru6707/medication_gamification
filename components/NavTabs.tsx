@@ -8,10 +8,13 @@ import { useAuth } from "@/context/AuthContext";
 export default function NavTabs(){
   const pathname = usePathname();
   const { user } = useAuth();
+  
+  const hasChildren = user?.role === "parent" && user?.children && user.children.length > 0;
+  
   const parentTabs = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
     { href: "/parent/children", label: "Children", icon: Users },
-    { href: "/parent/add-med", label: "Add Med", icon: Plus },
+    ...(hasChildren ? [{ href: "/parent/add-med", label: "Add Med", icon: Plus }] : []),
     { href: "/chat", label: "Chat", icon: MessageCircle },
     { href: "/profile", label: "Profile", icon: User },
   ];

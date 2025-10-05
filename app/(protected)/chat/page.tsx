@@ -1,20 +1,44 @@
 "use client";
 import NavTabs from "@/components/NavTabs";
+import { useAuth } from "@/context/AuthContext";
 import { useEffect, useRef, useState } from "react";
+import { getAuth } from "firebase/auth";
+
 type Msg = { role: "assistant" | "user"; content: string };
 
 export default function ChatPage(){
+  const { user } = useAuth();
   const [msgs, setMsgs] = useState<Msg[]>([{ role: "assistant", content: "Hi! I'm your MedMinder assistant. How can I help you today?" }]);
-  const [input, setInput] = useState(""); const endRef = useRef<HTMLDivElement>(null);
+  const [input, setInput] = useState(""); 
+  const endRef = useRef<HTMLDivElement>(null);
 
   const send = async () => {
     if (!input.trim()) return;
     const my = { role: "user", content: input.trim() } as Msg;
-    setMsgs(m => [...m, my]); setInput("");
-    const res = await fetch("/api/chat", { method: "POST", body: JSON.stringify({ message: my.content }) });
-    const data = await res.json();
-    setMsgs(m => [...m, { role: "assistant", content: data.reply }]);
+    setMsgs(m => [...m, my]); 
+    setInput("");
+    
+    try {
+      const auth = getAuth();
+      const firebaseToken = await auth.currentUser?.getIdToken();
+      
+      const res = await fetch("/api/chat", { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          message: my.content,
+          firebaseToken 
+        }) 
+      });
+      
+      const data = await res.json();
+      setMsgs(m => [...m, { role: "assistant", content: data.reply }]);
+    } catch (error) {
+      console.error("Chat error:", error);
+      setMsgs(m => [...m, { role: "assistant", content: "Sorry, I'm having trouble connecting right now. Please try again." }]);
+    }
   };
+  
   useEffect(()=>{ endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
 
   return (
