@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { loadMeds, saveMeds } from "@/lib/storage";
+import { loadMeds, saveMeds, pushEvent } from "@/lib/storage";
 import { extractMedicationInfo } from "@/lib/gemini-ocr";
 import { Upload, Save, X, Camera } from "lucide-react";
 import NavTabs from "@/components/NavTabs";
@@ -38,6 +38,60 @@ function AddMedPage() {
   const addTime = () => setTimes(t => [...t, "20:00"]);
   const updateTime = (i:number, val:string) => setTimes(ts => ts.map((t, idx)=> idx===i? val : t));
   const removeTime = (i:number) => setTimes(ts => ts.filter((_, idx)=> idx!==i));
+
+  const logDose = async (medId: string) => {
+    if (!user?.uid) return;
+    
+    setSavedMedications(prev => {
+      const arr = [...prev];
+      const idx = arr.findIndex(m => m.id === medId);
+      if (idx >= 0) {
+        const m = arr[idx];
+        const totalDoses = m.times.length * (m.duration || 7);
+        const oldTaken = m.progress?.taken || 0;
+        const newTaken = oldTaken + 1;
+        const updated = { 
+          ...m, 
+          progress: { 
+            taken: newTaken, 
+            total: m.progress?.total || totalDoses 
+          } 
+        };
+        arr[idx] = updated;
+        saveMeds(user.uid, arr);
+        pushEvent(user.uid, { id: String(Date.now()), medId, when: Date.now(), who: "parent" });
+
+        // Check for milestone notifications
+        const newPercent = (newTaken / updated.progress.total) * 100;
+
+        // Doctor Checkup Reminder - Show whenever progress > 50%
+        if (newPercent > 50 && newPercent <= 100) {
+          if (Notification.permission === "granted") {
+            new Notification("👨‍⚕️ Time for a Doctor Checkup!", {
+              body: `Your ${m.name} progress is at ${Math.round(newPercent)}%. Consider scheduling a follow-up appointment with the doctor to review the treatment.`,
+              icon: "/medication-icon.png",
+              tag: `doctor-checkup-${medId}`,
+              requireInteraction: true
+            });
+          }
+        }
+
+        // Overdose Warning - Show when exceeding 100%
+        if (newPercent > 100) {
+          if (Notification.permission === "granted") {
+            new Notification("⚠️ OVERDOSE WARNING - Exceeded Treatment Duration!", {
+              body: `You have taken more ${m.name} doses than prescribed (${Math.round(newPercent)}%)! STOP taking this medication and contact your doctor immediately.`,
+              icon: "/medication-icon.png",
+              tag: `overdose-${medId}`,
+              requireInteraction: true,
+              silent: false
+            });
+          }
+        }
+      }
+      return arr;
+    });
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -374,12 +428,12 @@ function AddMedPage() {
           {savedMedications.length > 0 && (
             <div className="card card-pad">
               <h2 className="text-xl font-bold mb-4">My Saved Medications ({savedMedications.length})</h2>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-3">
                 {savedMedications.map((med) => (
                   <MedicationCard 
                     key={med.id} 
                     med={med} 
-                    hideLog
+                    onLog={() => logDose(med.id)}
                   />
                 ))}
               </div>

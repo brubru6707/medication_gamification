@@ -1,5 +1,7 @@
 "use client";
-import { Clock, CheckCircle, Calendar } from "lucide-react";
+import { Clock, CheckCircle, Calendar, Swords } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 export type Medication = {
   id: string;
@@ -12,7 +14,30 @@ export type Medication = {
 };
 
 export default function MedicationCard({ med, onLog, hideLog=false }:{ med: Medication; onLog?: ()=>void; hideLog?: boolean }){
+  const { user } = useAuth();
+  const router = useRouter();
   const pct = Math.min(100, 100 * (med.progress?.taken || 0) / (med.progress?.total || 1));
+  
+  const handleBattle = () => {
+    // Encode medication data and pass to game
+    const medData = {
+      account_id: user?.uid || 'unknown',
+      med_id: med.id,
+      med_name: med.name,
+      med_desc: `${med.dosage} - ${med.frequency}`,
+      streak: med.progress?.taken || 0
+    };
+    
+    // Navigate to game with medication data in URL
+    const params = new URLSearchParams({
+      medData: JSON.stringify(medData)
+    });
+    
+    router.push(`/game?${params.toString()}`);
+  };
+  
+  const isChild = user?.role === "child";
+  
   return (
     <div className="card card-pad flex items-start justify-between">
       <div>
@@ -37,7 +62,10 @@ export default function MedicationCard({ med, onLog, hideLog=false }:{ med: Medi
           <span>{(med.times && med.times.length > 0) ? med.times.join(", ") : "No time set"}</span>
         </div>
         <div className="text-slate-500 text-sm">{med.progress?.taken || 0}/{med.progress?.total || 0}</div>
-        {!hideLog && <button className="btn btn-primary flex items-center gap-2" onClick={onLog}><CheckCircle size={16}/> Log dose</button>}
+        <div className="flex gap-2">
+          {!hideLog && <button className="btn btn-primary flex items-center gap-2" onClick={onLog}><CheckCircle size={16}/> Log dose</button>}
+          {isChild && <button className="btn bg-purple-500 hover:bg-purple-600 text-white flex items-center gap-2" onClick={handleBattle}><Swords size={16}/> Battle</button>}
+        </div>
       </div>
     </div>
   );

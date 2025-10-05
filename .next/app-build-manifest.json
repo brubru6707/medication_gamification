@@ -51,6 +51,11 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(protected)/meds/page.js"
     ],
+    "/(protected)/game/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(protected)/game/page.js"
+    ],
     "/_not-found/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",

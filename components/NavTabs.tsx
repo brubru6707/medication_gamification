@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Pill, MessageCircle, User, LayoutGrid, Users, Plus } from "lucide-react";
+import { Pill, MessageCircle, User, LayoutGrid, Users, Plus, Gamepad2 } from "lucide-react";
 import clsx from "classnames";
 import { useAuth } from "@/context/AuthContext";
 
@@ -21,6 +21,7 @@ export default function NavTabs(){
   const childTabs = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutGrid },
     { href: "/meds", label: "Meds", icon: Pill },
+    { href: "/game", label: "Game", icon: Gamepad2 },
     { href: "/chat", label: "Chat", icon: MessageCircle },
     { href: "/profile", label: "Profile", icon: User },
   ];
