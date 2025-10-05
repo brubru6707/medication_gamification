@@ -1,7 +1,6 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
   "/(protected)/parent/children/page": "app/(protected)/parent/children/page.js",
-  "/(protected)/parent/add-med/page": "app/(protected)/parent/add-med/page.js",
   "/(protected)/chat/page": "app/(protected)/chat/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(protected)/dashboard/page": "app/(protected)/dashboard/page.js",
