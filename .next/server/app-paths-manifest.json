@@ -1,4 +1,7 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
-  "/(protected)/parent/add-med/page": "app/(protected)/parent/add-med/page.js"
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(auth)/signup/page": "app/(auth)/signup/page.js",
+  "/(protected)/dashboard/page": "app/(protected)/dashboard/page.js",
+  "/(protected)/profile/page": "app/(protected)/profile/page.js",
+  "/page": "app/page.js"
 }

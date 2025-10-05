@@ -1,12 +1,13 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { loadMeds, saveMeds } from "@/lib/storage";
 import { extractMedicationInfo } from "@/lib/gemini-ocr";
 import { Upload, Save, X, Camera } from "lucide-react";
 
 function AddMedPage() {
-  const { user } = useAuth();
+  const { user, getProfile } = useAuth();
+  const [children, setChildren] = useState<any[]>([]);
   const [selectedChild, setSelectedChild] = useState("");
   const [images, setImages] = useState<File[]>([]);
   const [name, setName] = useState("");
@@ -19,7 +20,21 @@ function AddMedPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const children = user?.children || [];
+  useEffect(()=>{
+    async function loadChildren() {
+      if (!user?.children) return;
+      const profiles = [];
+      for (const uid of user.children) {
+        const profile = await getProfile(uid);
+        if (profile) profiles.push(profile);
+      }
+      setChildren(profiles);
+      if (profiles.length > 0 && !selectedChild) {
+        setSelectedChild(profiles[0].uid);
+      }
+    }
+    loadChildren();
+  }, [user?.children]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);

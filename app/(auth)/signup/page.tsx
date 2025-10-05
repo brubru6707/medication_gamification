@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -12,15 +12,15 @@ export default function SignupPage(){
   const [dob, setDob] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [parentId, setParentId] = useState("");
+  const [parentCode, setParentCode] = useState("");
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await register(name, dob, email, password, role, role === "child" ? parentId : undefined);
+      await register(name, dob, email, password, role, role === "child" ? parentCode : undefined);
       r.push("/dashboard");
     } catch (err:any) {
-      alert(err?.message || "Could not sign up. If you're creating a child account, make sure the Parent ID is correct.");
+      alert(err?.message || "Could not sign up. If you're creating a child account, make sure the Parent Code is correct.");
     }
   };
 
@@ -30,7 +30,7 @@ export default function SignupPage(){
         <div className="card-pad">
           <div className="text-center mb-6">
             <div className="text-2xl font-bold">Create your account</div>
-            <div className="text-slate-500">Parents first, then children link via Parent ID</div>
+            <div className="text-slate-500">Parents first, then children link via Parent Code</div>
           </div>
           <form onSubmit={submit} className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
@@ -39,8 +39,8 @@ export default function SignupPage(){
             </div>
             {role==="child" && (
               <div>
-                <label>Parent ID</label>
-                <input value={parentId} onChange={e=>setParentId(e.target.value.trim())} placeholder="Paste Parent ID from parent Profile" required />
+                <label>Parent Code</label>
+                <input value={parentCode} onChange={e=>setParentCode(e.target.value.trim().toUpperCase())} placeholder="Enter 6-digit Parent Code" required maxLength={6} />
               </div>
             )}
             <div><label>Full Name</label><input value={name} onChange={e=>setName(e.target.value)} required /></div>

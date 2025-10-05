@@ -8,8 +8,21 @@ import { loadMeds, saveMeds, pushEvent } from "@/lib/storage";
 
 export default function ParentChildrenPage(){
   const { user, getProfile } = useAuth();
-  const children = useMemo(()=> (user?.children || []).map(uid => getProfile(uid)).filter(Boolean) as any[], [user?.children]);
+  const [children, setChildren] = useState<any[]>([]);
   const [medsByChild, setMedsByChild] = useState<Record<string, Medication[]>>({});
+
+  useEffect(()=>{
+    async function loadChildren() {
+      if (!user?.children) return;
+      const profiles = [];
+      for (const uid of user.children) {
+        const profile = await getProfile(uid);
+        if (profile) profiles.push(profile);
+      }
+      setChildren(profiles);
+    }
+    loadChildren();
+  }, [user?.children]);
 
   useEffect(()=>{
     const map: Record<string, Medication[]> = {};

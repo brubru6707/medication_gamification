@@ -2,61 +2,97 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile } from "firebase/auth";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, arrayUnion, collection, query, where, getDocs } from "firebase/firestore";
 import { genUid } from "@/lib/ids";
 
 export type Role = "parent" | "child";
-export type User = { uid: string; email: string | null; displayName?: string | null; dob?: string | null; role: Role; parentId?: string | null; children?: string[] };
+export type User = { uid: string; email: string | null; displayName?: string | null; dob?: string | null; role: Role; parentCode?: string | null; parentId?: string | null; children?: string[] };
 
 type AuthCtx = {
   user: User | null;
   loading: boolean;
   login: (email:string, password:string)=>Promise<void>;
-  register: (name:string, dob: string, email:string, password:string, role: Role, parentId?: string)=>Promise<void>;
+  register: (name:string, dob: string, email:string, password:string, role: Role, parentCode?: string)=>Promise<void>;
   logout: ()=>Promise<void>;
-  linkChildToParent: (parentId: string, childUid: string)=>boolean;
-  getProfile: (uid: string)=>User | null;
+  linkChildToParent: (parentCode: string, childUid: string)=>Promise<boolean>;
+  getProfile: (uid: string)=>Promise<User | null>;
 };
 
 const Ctx = createContext<AuthCtx | null>(null);
 
+const firebaseConfig = {
+  apiKey: "AIzaSyBKeLntfFEDxdZGUfhtdUKvl58WrHt6TdM",
+  authDomain: "medication-gamification.firebaseapp.com",
+  projectId: "medication-gamification",
+  storageBucket: "medication-gamification.firebasestorage.app",
+  messagingSenderId: "164714302991",
+  appId: "1:164714302991:web:e6cbb642539dc93cdcdd7a",
+  measurementId: "G-VE9ZC0KSEG"
+};
+
 function createFirebaseAuth(){
-  const config = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "demo",
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "localhost",
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "demo",
-  };
-  const app = getApps().length ? getApps()[0] : initializeApp(config as any);
+  const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   return getAuth(app);
 }
 
-function saveProfile(p: User){ localStorage.setItem(`userProfile:${p.uid}`, JSON.stringify(p)); }
-function readProfile(uid: string): User | null { const raw = localStorage.getItem(`userProfile:${uid}`); return raw ? JSON.parse(raw) : null; }
-function parentExists(parentId?: string | null){ if (!parentId) return false; return !!readProfile(parentId); }
-function addChildToParent(parentId: string, childUid: string){
-  const p = readProfile(parentId); if (!p) return false;
-  const children = Array.from(new Set([...(p.children || []), childUid]));
-  const updated = { ...p, children };
-  saveProfile(updated);
-  return true;
+function createFirestore(){
+  const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+  return getFirestore(app);
+}
+
+function generateParentCode(): string {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+async function saveProfile(db: any, p: User){ 
+  await setDoc(doc(db, "users", p.uid), p);
+}
+
+async function readProfile(db: any, uid: string): Promise<User | null> { 
+  const docSnap = await getDoc(doc(db, "users", uid));
+  return docSnap.exists() ? docSnap.data() as User : null;
+}
+
+async function findParentByCode(db: any, parentCode: string): Promise<User | null> {
+  const q = query(collection(db, "users"), where("parentCode", "==", parentCode), where("role", "==", "parent"));
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  return snapshot.docs[0].data() as User;
+}
+
+async function addChildToParent(db: any, parentUid: string, childUid: string){
+  await updateDoc(doc(db, "users", parentUid), {
+    children: arrayUnion(childUid)
+  });
 }
 
 export function AuthProvider({ children }:{children: React.ReactNode}){
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const auth = createFirebaseAuth();
+  const db = createFirestore();
 
   useEffect(()=>{
-    const unsub = onAuthStateChanged(auth, (fbUser)=>{
+    const unsub = onAuthStateChanged(auth, async (fbUser)=>{
       if (fbUser) {
-        const stored = readProfile(fbUser.uid);
-        if (stored) { setUser(stored); }
-        else {
-          const u: User = { uid: fbUser.uid, email: fbUser.email, displayName: fbUser.displayName || undefined, dob: null, role: "parent", children: [] };
-          saveProfile(u); setUser(u);
+        const stored = await readProfile(db, fbUser.uid);
+        if (stored) { 
+          setUser(stored); 
+        } else {
+          const u: User = { 
+            uid: fbUser.uid, 
+            email: fbUser.email, 
+            displayName: fbUser.displayName || undefined, 
+            dob: null, 
+            role: "parent", 
+            parentCode: generateParentCode(),
+            children: [] 
+          };
+          await saveProfile(db, u); 
+          setUser(u);
         }
       } else {
-        const raw = localStorage.getItem("demoUser");
-        if (raw) setUser(JSON.parse(raw)); else setUser(null);
+        setUser(null);
       }
       setLoading(false);
     });
@@ -64,71 +100,73 @@ export function AuthProvider({ children }:{children: React.ReactNode}){
   }, []);
 
   const login = async (email:string, password:string) => {
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      const fb = auth.currentUser!;
-      const profile = readProfile(fb.uid);
-      if (profile) setUser(profile);
-      else {
-        const fallback: User = { uid: fb.uid, email: fb.email, displayName: fb.displayName || undefined, role: "parent", children: [] };
-        saveProfile(fallback); setUser(fallback);
-      }
-    } catch {
-      // demo: pick whichever demo was last created in localStorage
-      const last = localStorage.getItem("lastDemoUid");
-      const demo = last ? readProfile(last) : null;
-      if (demo) setUser(demo as User);
-      else {
-        // if no demo exists, create a parent demo
-        const uid = genUid("parent");
-        const u: User = { uid, email, displayName: "Parent Demo", role: "parent", children: [] };
-        saveProfile(u); localStorage.setItem("lastDemoUid", uid); localStorage.setItem("demoUser", JSON.stringify(u)); setUser(u);
-      }
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const profile = await readProfile(db, cred.user.uid);
+    if (profile) {
+      setUser(profile);
+    } else {
+      const fallback: User = { 
+        uid: cred.user.uid, 
+        email: cred.user.email, 
+        displayName: cred.user.displayName || undefined, 
+        role: "parent",
+        parentCode: generateParentCode(),
+        children: [] 
+      };
+      await saveProfile(db, fallback); 
+      setUser(fallback);
     }
   };
 
-  const register = async (name:string, dob:string, email:string, password:string, role: Role, parentId?: string) => {
-    try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(cred.user, { displayName: name });
-      const uid = cred.user.uid;
-      let profile: User;
-      if (role === "parent") {
-        profile = { uid, email, displayName: name, dob, role: "parent", children: [] };
-      } else {
-        if (!parentExists(parentId)) throw new Error("Parent ID not found");
-        profile = { uid, email, displayName: name, dob, role: "child", parentId: parentId || null };
-        addChildToParent(parentId!, uid);
-      }
-      saveProfile(profile);
-      setUser(profile);
-      localStorage.setItem("lastDemoUid", uid);
-    } catch {
-      // Demo fallback (no Firebase)
-      const uid = genUid(role);
-      let profile: User;
-      if (role === "parent") {
-        profile = { uid, email, displayName: name, dob, role: "parent", children: [] };
-      } else {
-        if (!parentExists(parentId)) { throw new Error("Parent ID not found (demo)"); }
-        profile = { uid, email, displayName: name, dob, role: "child", parentId: parentId || null };
-        addChildToParent(parentId!, uid);
-      }
-      saveProfile(profile);
-      setUser(profile);
-      localStorage.setItem("lastDemoUid", uid);
-      localStorage.setItem("demoUser", JSON.stringify(profile));
+  const register = async (name:string, dob:string, email:string, password:string, role: Role, parentCode?: string) => {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(cred.user, { displayName: name });
+    const uid = cred.user.uid;
+    let profile: User;
+    
+    if (role === "parent") {
+      profile = { 
+        uid, 
+        email, 
+        displayName: name, 
+        dob, 
+        role: "parent", 
+        parentCode: generateParentCode(),
+        children: [] 
+      };
+    } else {
+      if (!parentCode) throw new Error("Parent code required for child accounts");
+      const parent = await findParentByCode(db, parentCode);
+      if (!parent) throw new Error("Invalid parent code");
+      
+      profile = { 
+        uid, 
+        email, 
+        displayName: name, 
+        dob, 
+        role: "child", 
+        parentId: parent.uid 
+      };
+      await addChildToParent(db, parent.uid, uid);
     }
+    
+    await saveProfile(db, profile);
+    setUser(profile);
   };
 
   const logout = async () => {
-    try { await signOut(auth); } catch {}
-    localStorage.removeItem("demoUser");
+    await signOut(auth);
     setUser(null);
   };
 
-  const linkChildToParent = (parentId: string, childUid: string) => addChildToParent(parentId, childUid);
-  const getProfile = (uid: string) => readProfile(uid);
+  const linkChildToParent = async (parentCode: string, childUid: string): Promise<boolean> => {
+    const parent = await findParentByCode(db, parentCode);
+    if (!parent) return false;
+    await addChildToParent(db, parent.uid, childUid);
+    return true;
+  };
+  
+  const getProfile = async (uid: string) => readProfile(db, uid);
 
   return <Ctx.Provider value={{ user, loading, login, register, logout, linkChildToParent, getProfile }}>{children}</Ctx.Provider>;
 }

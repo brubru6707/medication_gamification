@@ -22,9 +22,10 @@ export default function ProfilePage(){
 
         {isParent ? (
           <div className="card card-pad">
-            <h2 className="text-lg font-semibold">Your Parent ID</h2>
-            <p className="text-sm text-slate-600 mb-2">Children must enter this ID when signing up to link accounts.</p>
-            <div className="font-mono text-lg">{user?.uid}</div>
+            <h2 className="text-lg font-semibold">Your Parent Code</h2>
+            <p className="text-sm text-slate-600 mb-2">Children must enter this code when signing up to link accounts.</p>
+            <div className="font-mono text-3xl font-bold tracking-widest text-center p-4 bg-mint rounded">{user?.parentCode || "—"}</div>
+            <p className="text-xs text-slate-500 mt-2 text-center">Share this 6-digit code with your child</p>
           </div>
         ) : (
           <div className="card card-pad">
