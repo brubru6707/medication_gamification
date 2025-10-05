@@ -1,5 +1,5 @@
 "use client";
-import { Clock, CheckCircle } from "lucide-react";
+import { Clock, CheckCircle, Calendar } from "lucide-react";
 
 export type Medication = {
   id: string;
@@ -7,6 +7,7 @@ export type Medication = {
   dosage: string;
   times: string[];
   frequency: "Once daily" | "Twice daily" | "Custom";
+  duration?: number; // Duration in days
   progress?: { taken: number; total: number };
 };
 
@@ -17,6 +18,12 @@ export default function MedicationCard({ med, onLog, hideLog=false }:{ med: Medi
       <div>
         <div className="text-xl font-semibold">{med.name}</div>
         <div className="text-slate-500">{med.dosage} • {med.frequency}</div>
+        {med.duration && (
+          <div className="text-slate-500 text-sm mt-1 flex items-center gap-1">
+            <Calendar size={14} />
+            <span>{med.duration} day{med.duration !== 1 ? 's' : ''} duration</span>
+          </div>
+        )}
         <div className="mt-3">
           <div className="text-sm text-slate-600">Progress</div>
           <div className="h-2 bg-slate-200 rounded-full mt-1 w-64 max-w-full">

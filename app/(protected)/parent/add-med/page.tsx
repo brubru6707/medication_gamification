@@ -19,6 +19,7 @@ function AddMedPage() {
   const [rxNumber, setRxNumber] = useState("");
   const [times, setTimes] = useState<string[]>(["08:00"]);
   const [frequency, setFrequency] = useState<"Once daily" | "Twice daily" | "Custom">("Once daily");
+  const [duration, setDuration] = useState<number>(7);
   const [loading, setLoading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [savedMedications, setSavedMedications] = useState<Medication[]>([]);
@@ -134,17 +135,19 @@ function AddMedPage() {
     }
 
     const existingMeds = loadMeds(user.uid);
+    const totalDoses = times.length * duration; // Calculate total doses based on duration
     const newMed: Medication = {
       id: Date.now().toString(),
       name,
       dosage,
       frequency,
       times: times.length > 0 ? times : ["08:00"],
-      progress: { taken: 0, total: times.length * 7 }
+      duration: duration,
+      progress: { taken: 0, total: totalDoses }
     };
 
     const updatedMeds = [...existingMeds, newMed];
-    saveMeds(user.uid, updatedMeds);
+    await saveMeds(user.uid, updatedMeds);
     
     // Update the saved medications list
     setSavedMedications(updatedMeds);
@@ -157,6 +160,7 @@ function AddMedPage() {
     setImages([]);
     setTimes(["08:00"]);
     setFrequency("Once daily");
+    setDuration(7);
     stopCamera();
     
     alert('Medication added successfully!');
@@ -289,6 +293,20 @@ function AddMedPage() {
             </div>
 
             <div>
+              <label className="block text-sm font-medium mb-2">Duration (days)</label>
+              <input
+                type="number"
+                value={duration}
+                onChange={(e) => setDuration(parseInt(e.target.value, 10) || 7)}
+                className="w-full p-2 border rounded-md"
+                placeholder="e.g., 7, 30, 90"
+                min={1}
+                max={365}
+              />
+              <div className="text-xs text-slate-500 mt-1">How many days will you take this medication?</div>
+            </div>
+
+            <div>
               <label className="block text-sm font-medium mb-2">Time(s)</label>
               <div className="space-y-2">
                 {times.map((t, i) => (
@@ -361,7 +379,7 @@ function AddMedPage() {
                   <MedicationCard 
                     key={med.id} 
                     med={med} 
-                    onMark={() => {}} 
+                    hideLog
                   />
                 ))}
               </div>

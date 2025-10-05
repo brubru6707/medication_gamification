@@ -2,9 +2,11 @@
 import NavTabs from "@/components/NavTabs";
 import MedicationCard, { Medication } from "@/components/MedicationCard";
 import AddMedicationDialog from "@/components/AddMedicationDialog";
+import NotificationBanner from "@/components/NotificationBanner";
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useMemo, useState } from "react";
 import { loadMeds, saveMeds, pushEvent } from "@/lib/storage";
+import { monitorChildMedications } from "@/lib/notifications";
 
 export default function ParentChildrenPage(){
   const { user, getProfile } = useAuth();
@@ -30,25 +32,83 @@ export default function ParentChildrenPage(){
     setMedsByChild(map);
   }, [children.length]);
 
-  const addMed = (childUid: string, m: Medication) => {
+  // Monitor all children's medications for notifications
+  useEffect(() => {
+    if (children.length === 0) return;
+
+    const cleanupFunctions = children.map(child => {
+      const meds = medsByChild[child.uid] || [];
+      if (meds.length === 0) return () => {};
+      
+      return monitorChildMedications(
+        child.displayName || "Your child",
+        () => loadMeds(child.uid)
+      );
+    });
+
+    return () => {
+      cleanupFunctions.forEach(cleanup => cleanup());
+    };
+  }, [children.length, Object.keys(medsByChild).length]);
+
+  const addMed = async (childUid: string, m: Medication) => {
     setMedsByChild(prev => {
       const arr = [...(prev[childUid] || [])];
-      arr.push({ ...m, progress: { taken: 0, total: m.times.length * 7 } });
-      saveMeds(childUid, arr);
+      const totalDoses = m.times.length * (m.duration || 7); // Use duration from medication or default to 7
+      arr.push({ ...m, progress: { taken: 0, total: totalDoses } });
+      saveMeds(childUid, arr); // Fire and forget - don't block UI
       return { ...prev, [childUid]: arr };
     });
   };
 
-  const logDose = (childUid: string, medId: string) => {
+  const logDose = async (childUid: string, medId: string) => {
     setMedsByChild(prev => {
       const arr = [...(prev[childUid] || [])];
       const idx = arr.findIndex(m => m.id === medId);
       if (idx >= 0) {
         const m = arr[idx];
-        const updated = { ...m, progress: { taken: (m.progress?.taken || 0) + 1, total: m.progress?.total || m.times.length * 7 } };
+        const totalDoses = m.times.length * (m.duration || 7);
+        const oldTaken = m.progress?.taken || 0;
+        const newTaken = oldTaken + 1;
+        const updated = { 
+          ...m, 
+          progress: { 
+            taken: newTaken, 
+            total: m.progress?.total || totalDoses 
+          } 
+        };
         arr[idx] = updated;
         saveMeds(childUid, arr);
         pushEvent(childUid, { id: String(Date.now()), medId, when: Date.now(), who: "parent" });
+
+        // Check for milestone notifications
+        const childName = children.find(c => c.uid === childUid)?.displayName || "Your child";
+        const newPercent = (newTaken / updated.progress.total) * 100;
+
+        // 50% Doctor Checkup Reminder - Show whenever progress > 50%
+        if (newPercent > 50 && newPercent <= 100) {
+          if (Notification.permission === "granted") {
+            new Notification("�‍⚕️ Time for a Doctor Checkup!", {
+              body: `${childName}'s ${m.name} progress is at ${Math.round(newPercent)}%. Consider scheduling a follow-up appointment with the doctor to review the treatment.`,
+              icon: "/medication-icon.png",
+              tag: `doctor-checkup-${medId}`,
+              requireInteraction: true
+            });
+          }
+        }
+
+        // Overdose Warning - Show when exceeding 100%
+        if (newPercent > 100) {
+          if (Notification.permission === "granted") {
+            new Notification("⚠️ OVERDOSE WARNING - Exceeded Treatment Duration!", {
+              body: `${childName} has taken more ${m.name} doses than prescribed (${Math.round(newPercent)}%)! STOP taking this medication and contact your doctor immediately.`,
+              icon: "/medication-icon.png",
+              tag: `overdose-${medId}`,
+              requireInteraction: true,
+              silent: false
+            });
+          }
+        }
       }
       return { ...prev, [childUid]: arr };
     });
@@ -66,6 +126,7 @@ export default function ParentChildrenPage(){
   return (
     <div>
       <NavTabs />
+      <NotificationBanner />
       <h1 className="text-3xl font-bold mb-4">Your Children</h1>
       {children.length === 0 ? (
         <div className="card card-pad text-slate-600">No children linked yet. Ask your child to sign up and enter your Parent ID from your Profile.</div>

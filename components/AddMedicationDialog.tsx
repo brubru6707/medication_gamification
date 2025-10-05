@@ -23,12 +23,14 @@ export default function AddMedicationDialog({ onAdd }:{ onAdd: (m:Medication)=>v
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const fd = new FormData(formRef.current!);
+    const duration = parseInt(String(fd.get("duration")||"7"), 10) || 7;
     const med: Medication = {
       id: String(Date.now()),
       name: String(fd.get("name")||"").trim() || "New Medication",
       dosage: String(fd.get("dosage")||""),
       frequency: freq as Medication["frequency"],
-      times: times.length > 0 ? times : ["08:00"]  // Ensure times is never empty
+      times: times.length > 0 ? times : ["08:00"],  // Ensure times is never empty
+      duration: duration
     };
     onAdd(med);
     setOpen(false);
@@ -238,6 +240,19 @@ export default function AddMedicationDialog({ onAdd }:{ onAdd: (m:Medication)=>v
                     <option>Twice daily</option>
                     <option>Custom</option>
                   </select>
+                </div>
+                <div>
+                  <label>Duration (days)</label>
+                  <input 
+                    type="number" 
+                    name="duration" 
+                    defaultValue={7} 
+                    min={1} 
+                    max={365}
+                    placeholder="e.g., 7, 30, 90"
+                    className="w-full"
+                  />
+                  <div className="text-xs text-slate-500 mt-1">How many days will you take this medication?</div>
                 </div>
                 <div>
                   <label>Time(s)</label>
