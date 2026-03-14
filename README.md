@@ -1,18 +1,38 @@
-# MedMinder – Linked Accounts (Parent-first)
+![MedMinders Game](./medminders_game.png)
 
-This build enforces **Parent-first sign up**. A child cannot create an account unless they enter a valid **Parent ID**. Parents log doses for their linked children from the **Children** tab.
+# MedMinders
 
-## Run
-```bash
-npm install
-npm run dev
-# http://localhost:3000
-```
+## Inspiration
+Each year, **125,000 lives are lost in the United States simply because medications are not taken as prescribed**. Medication mismanagement leads to preventable complications, hospitalizations, and dangerous drug interactions. We created **MedMinders** to address this problem and help people take their medications safely and consistently.
 
-## Flow
-1. **Parent signs up** (Profile shows **Parent ID**).
-2. **Child signs up** with that Parent ID → accounts are linked.
-3. Parent opens **Children** tab → selects child → **Log dose** on each medication.
-4. Child can view meds, but cannot log doses.
+## What It Does
+**MedMinders** is a secure and user-friendly platform designed to help individuals and families manage medications with confidence.  
 
-> Demo uses `localStorage`. In production, store users/links and meds in your backend (e.g., Firestore) and write dose logs as auditable records.
+The platform combines health management with **gamification**, turning medication adherence into an engaging experience rather than a chore. Users can track medications, receive guidance, and stay protected from dangerous drug interactions while interacting with an integrated game and AI-powered assistance.
+
+## How We Built It
+We built MedMinders using **Next.js** as the core framework for the web application. The project includes:
+
+- A **frontend web interface** for user interaction
+- A **backend system** to manage data and services
+- A **fully integrated game** that gamifies medication adherence
+- AI-powered features and secure data handling
+
+## Challenges We Ran Into
+One of our biggest challenges was **integrating the frontend and backend systems**. The process took around **12 hours of debugging, iteration, and troubleshooting** before everything communicated correctly. Despite the hurdles, persistence and teamwork helped us get everything running smoothly.
+
+## Accomplishments That We're Proud Of
+We are proud that **every major component of MedMinders is fully functional**, including:
+
+- The chatbot
+- The interactive game
+- The frontend interface
+- The backend infrastructure
+
+Seeing all of these systems work together as a cohesive platform was a huge milestone.
+
+## Built With
+- Firebase  
+- Gemini  
+- Next.js  
+- Python
