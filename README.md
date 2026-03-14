@@ -1,7 +1,5 @@
-![MedMinders Game](./medminders_game.png)
-
 # MedMinders
-
+![MedMinders Game](./medminders_game.png)
 ## Inspiration
 Each year, **125,000 lives are lost in the United States simply because medications are not taken as prescribed**. Medication mismanagement leads to preventable complications, hospitalizations, and dangerous drug interactions. We created **MedMinders** to address this problem and help people take their medications safely and consistently.
 
